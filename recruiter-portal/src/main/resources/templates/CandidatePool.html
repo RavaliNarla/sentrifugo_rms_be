@@ -1,0 +1,132 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Candidate Pool Details</title>
+
+    <style>
+        /* Re-added A4 size with very minimal margins to maximize table space */
+        @page {
+            size: A4;
+            margin: 5mm;
+        }
+
+        body {
+            font-family: "Segoe UI", Arial, sans-serif;
+            background: #ffffff;
+            margin: 0;
+            padding: 0;
+            color: #333;
+        }
+
+        .container {
+            width: 100%;
+            margin: 0;
+            background: #fff;
+            padding: 0;
+            border-radius: 8px;
+        }
+
+        .header {
+            border: 1px solid #ffb27a;
+            background: #fff7f1;
+            padding: 10px 14px;
+            margin-bottom: 12px;
+        }
+
+        .header h2 {
+            margin: 0;
+            font-size: 20px;
+            font-weight: 600;
+            color: #ff6a00;
+        }
+
+        .header p {
+            margin: 6px 0 0;
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        /* Table base */
+        .my-table {
+            border-collapse: collapse;
+            width: 100%;
+            table-layout: fixed;
+            border: 1px solid #999;
+        }
+
+        .my-table th {
+            background-color: #f4f6f8;
+            font-weight: 600;
+        }
+
+        .my-table th,
+        .my-table td {
+            border: 1px solid #999;
+            text-align: center;
+            vertical-align: middle;
+            font-size: 13px;
+            padding: 6px 2px;
+            word-wrap: break-word;
+        }
+
+        /* Adjusted Column Widths to total 100% for 9 columns */
+        .col-position { width: 14%; }
+        .col-fullname { width: 16%; }
+        .col-regno { width: 12%; }
+        .col-rank { width: 7%; }
+        .col-score { width: 7%; }
+        .col-workexp { width: 11%; }
+        .col-status { width: 13%; }
+        .col-city { width: 10%; }
+        .col-category { width: 10%; }
+        /* ------------------------------------------------------- */
+
+    </style>
+
+</head>
+
+<body>
+<div class="container">
+
+    <div class="header">
+        <h2>Candidate Pool Details</h2>
+        <p>
+            <strong>Requisition Title:</strong>
+            <span th:text="${requisitionTitle ?: '-'}"></span>
+        </p>
+    </div>
+
+    <table class="my-table">
+        <thead>
+        <tr>
+            <th class="col-position">Applied Position</th>
+            <th class="col-fullname">Full Name</th>
+            <th class="col-regno">Application Number</th>
+            <th class="col-rank">Rank</th>
+            <th class="col-score">Score</th>
+            <th class="col-workexp">Work Experience</th>
+            <th class="col-status">Application Status</th>
+            <th class="col-city">Location</th>
+            <th class="col-category">Category</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr th:each="candidate : ${candidateDetails}">
+            <td class="col-position" th:text="${candidate.position ?: position ?: '-'}"></td>
+            <td class="col-fullname" th:text="${candidate.fullName ?: '-'}"></td>
+            <td class="col-regno" th:text="${candidate.applicationNo ?: '-'}"></td>
+            <td class="col-rank" th:text="${candidate.rank ?: '-'}"></td>
+            <td class="col-score" th:text="${candidate.finalScore ?: '-'}"></td>
+            <td class="col-workexp" th:text="${candidate.workExperience ?: '-'}"></td>
+            <td class="col-status" th:text="${candidate.status ?: '-'}"></td>
+            <td class="col-city" th:text="${candidate.location ?: '-'}"></td>
+            <td class="col-category" th:text="${candidate.category ?: '-'}"></td>
+        </tr>
+        </tbody>
+    </table>
+
+</div>
+</body>
+</html>

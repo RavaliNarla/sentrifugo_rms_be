@@ -1,0 +1,169 @@
+<!doctype html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Dashboard Report</title>
+
+    <style>
+
+        @page {
+            size: A3 landscape;
+            margin: 8mm;
+        }
+
+        body {
+            font-family:Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #333;
+            background: #fff;
+        }
+
+        .container {
+            width: 100%;
+        }
+
+        /*================ HEADER ================*/
+
+        .header {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .logo-block {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .left-logo {
+            height: 60px;
+            width: auto;
+        }
+
+        .bank-text {
+            display: inline-block;
+        }
+
+        .bank-title-hi {
+            color: #f36c21;
+            font-size: 16px;
+            font-weight: bold;
+            line-height: 1.2;
+        }
+
+        .bank-title-en {
+            color: #f36c21;
+            font-size: 20px;
+            font-weight: bold;
+            line-height: 1.2;
+        }
+
+        .report-title {
+            width: 100%;
+            text-align: center;
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 10px;
+            margin-bottom: 20px;
+            color: #333;
+        }
+
+        /*================ TABLE ================*/
+
+        .my-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+
+        .my-table th {
+            background: #f4f6f8;
+            font-weight: bold;
+        }
+
+        .my-table th,
+        .my-table td {
+            border: 1px solid #999;
+            text-align: center;
+            vertical-align: middle;
+            padding: 6px 4px;
+            font-size: 13px;
+            word-break: break-word;
+        }
+
+    </style>
+</head>
+
+<body>
+
+<div class="container">
+
+    <!-- Header -->
+
+    <div class="header">
+
+        <div class="logo-block">
+
+            <img
+                    src="images/orange_logo.jpg"
+                    class="left-logo"
+                    alt="Sagarsoft"/>
+
+            <div class="bank-text">
+
+                <div class="bank-title-hi">
+                    सागरसॉफ्ट
+                </div>
+
+                <div class="bank-title-en">
+                    Sagarsoft
+                </div>
+
+            </div>
+
+        </div>
+
+        <div class="report-title"
+             th:text="${reportTitle}">
+            Dashboard Report
+        </div>
+
+    </div>
+
+    <!-- Dynamic Table -->
+
+    <table class="my-table">
+
+        <thead>
+        <tr>
+            <th
+                    th:each="header : ${displayHeaders}"
+                    th:text="${header}">
+                Header
+            </th>
+        </tr>
+        </thead>
+
+        <tbody>
+
+        <tr th:each="row : ${rows}">
+
+            <td
+                    th:each="header : ${headers}"
+                    th:text="${row.get(header) == null || #strings.isEmpty(#strings.trim(row.get(header).toString())) ? '-' : row.get(header)}">
+                -
+            </td>
+
+        </tr>
+
+        </tbody>
+
+    </table>
+
+</div>
+
+</body>
+</html>

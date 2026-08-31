@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Interview Scheduled</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+            href="https://fonts.googleapis.com/css2?family=Poppins&display=swap"
+            rel="stylesheet"
+    />
+    <style>
+        .meeting-link:hover {
+          text-decoration: underline !important;
+          color: #2b3a6b !important;
+        }
+    </style>
+</head>
+<body
+        style="
+      margin: 0;
+      padding: 0;
+      font-family: &quot;Poppins&quot;, Arial, sans-serif;
+    "
+>
+<table
+        align="center"
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+        width="100%"
+        style="
+        background-color: #ffffff;
+        border: 3px solid #3498db;
+        border-collapse: collapse;
+        margin: 0 auto;
+      "
+>
+    <tr>
+        <td style="background-color: #3498db; padding: 15px 30px">
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                    <td
+                            align="left"
+                            valign="middle"
+                            style="
+                  color: #ffffff;
+                  font-size: 18px;
+                  font-weight: 600;
+                  font-family: &quot;Poppins&quot;, Arial, sans-serif;
+                "
+                    >
+                        Interview Scheduled
+                    </td>
+                    <td align="right" valign="middle">
+                        <img
+                                src="cid:logo"
+                                alt="Sagarsoft Logo"
+                                style="height: 45px; vertical-align: middle; border: 0"
+                        />
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <tr>
+        <td style="padding: 25px 30px; background-color: #ffffff">
+            <p style="font-size: 18px; color: #000000; margin: 0 0 10px 0">
+                Dear <strong th:text="${zonalHrName}">Zonal HR Name</strong>,
+            </p>
+
+            <p
+                    style="
+              font-size: 16px;
+              color: #000000;
+              margin: 0 0 25px 0;
+              line-height: 1.5;
+            "
+            >
+                You have interviews scheduled for your zone:
+                <strong th:text="${interviewCentre}">Interview Center</strong>.
+            </p>
+
+            <p
+                    style="
+              font-size: 16px;
+              color: #000000;
+              margin: 0 0 15px 0;
+              line-height: 1.5;
+            "
+            >
+                Please find the schedule details below:
+            </p>
+
+            <!-- Dynamic Data Table with Updated Styling -->
+            <table
+                    border="1"
+                    cellpadding="10"
+                    cellspacing="0"
+                    width="100%"
+                    style="
+              margin: 0 0 25px 0;
+              border-collapse: collapse;
+              border-color: #000000;
+              font-family: &quot;Poppins&quot;, Arial, sans-serif;
+              font-size: 15px;
+            "
+            >
+                <thead>
+                <tr style="background-color: #f9f9f9">
+                    <th align="left" style="font-weight: 600">Requisition</th>
+                    <th align="left" style="font-weight: 600">Position</th>
+                    <th align="left" style="font-weight: 600">Candidate Count</th>
+                    <th align="left" style="font-weight: 600">Start Date</th>
+                    <th align="left" style="font-weight: 600">Slot Start Time</th>
+                    <th align="left" style="font-weight: 600">End Date</th>
+                    <th align="left" style="font-weight: 600">Slot End Time</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr th:each="row : ${zonalHrData}">
+                    <td
+                            valign="top"
+                            style="color: #000000"
+                            th:text="${row.requisitionName}"
+                    >
+                        Requisition Name
+                    </td>
+                    <td
+                            valign="top"
+                            style="color: #000000"
+                            th:text="${row.positionName}"
+                    >
+                        Position Name
+                    </td>
+                    <td
+                            valign="top"
+                            style="color: #000000"
+                            th:text="${row.candidateCount}"
+                    >
+                        candidates count
+                    </td>
+                    <td
+                            valign="top"
+                            style="color: #000000"
+                            th:text="${row.startDate}"
+                    >
+                        DD-MM-YYYY
+                    </td>
+                    <td
+                            valign="top"
+                            style="color: #000000"
+                            th:text="${row.slotStartTime}"
+                    >
+                        HH:mm
+                    </td>
+                    <td
+                            valign="top"
+                            style="color: #000000"
+                            th:text="${row.slotEndDate}"
+                    >
+                        DD-MM-YYYY
+                    </td>
+                    <td
+                            valign="top"
+                            style="color: #000000"
+                            th:text="${row.slotEndTime}"
+                    >
+                        HH:mm
+                    </td>
+                </tr>
+                </tbody>
+            </table>
+
+            <p
+                    style="
+              font-size: 16px;
+              color: #000000;
+              margin: 0 0 25px 0;
+              line-height: 1.5;
+            "
+            >
+                Please ensure panels availability and coordinate with the interview
+                center if required.
+            </p>
+
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                    <td
+                            align="left"
+                            valign="bottom"
+                            style="font-size: 16px; color: #000000; line-height: 1.6"
+                    >
+                        <strong style="font-weight: 600">Regards,</strong><br />
+                        <span th:text="${companyName}">Sagarsoft</span>
+                    </td>
+                    <td
+                            align="right"
+                            valign="bottom"
+                            style="font-size: 14px; color: #3498db"
+                    >
+                        This is a system-generated email. Please do not reply.
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

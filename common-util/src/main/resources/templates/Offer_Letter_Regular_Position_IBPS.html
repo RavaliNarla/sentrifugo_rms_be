@@ -1,0 +1,2251 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Offer Letter Regular Position</title>
+    <style>
+      /* Strict A4 Print Pagination for PDF Converters */
+      @page {
+        size: A4;
+        margin: 8mm 15mm;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.25;
+        color: #000;
+        margin: 0;
+        padding: 0;
+        background: #fff;
+      }
+      /* Force all normal text to exactly 12px */
+      p,
+      td,
+      th,
+      span,
+      div,
+      li {
+        font-size: 12px;
+      }
+      p {
+        margin: 0;
+      }
+
+      /* Each container matches exact A4 height to push footer to the bottom */
+      .page-container {
+        position: relative;
+        width: 100%;
+        height: 280mm;
+        box-sizing: border-box;
+        padding-bottom: 25px;
+        margin: 0 auto;
+        page-break-after: always;
+        page-break-inside: avoid;
+        overflow: hidden;
+      }
+      .page-container:last-child {
+        page-break-after: auto;
+      }
+
+      /* Header styling */
+      .header-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 5px;
+      }
+      .header-table td {
+        vertical-align: middle;
+      }
+      .header-left {
+        text-align: left;
+        white-space: nowrap;
+      }
+      .header-right {
+        text-align: right;
+      }
+      .logo-img-left {
+        vertical-align: middle;
+        margin-right: 8px;
+        margin-left: 15px;
+      }
+      .logo-img-right {
+        vertical-align: middle;
+        margin-right: 15px;
+      }
+      .bank-title-hi {
+        color: #f15a22;
+        font-size: 18px !important;
+        font-weight: bold;
+        vertical-align: middle;
+        display: inline-block;
+        margin-top: 20px;
+      }
+      .bank-title-en {
+        color: #f15a22;
+        font-size: 18px !important;
+        font-weight: bold;
+        font-style: italic;
+        vertical-align: middle;
+        display: inline-block;
+        margin-left: 10px;
+        margin-top: 20px;
+      }
+
+      /* Sub-header styling */
+      .sub-header-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 6px;
+      }
+      .sub-header-table td {
+        vertical-align: bottom;
+      }
+      .sub-header-right p {
+        text-align: right;
+        font-weight: bold;
+        font-size: 13px !important;
+      }
+
+      /* Main Grid styling */
+      .grid-table {
+        width: 100%;
+        border-collapse: collapse;
+        border: 1px solid #000;
+        table-layout: fixed;
+      }
+      .grid-table > tbody > tr > td {
+        border: 1px solid #000;
+        padding: 3px 5px;
+        vertical-align: top;
+        width: 50%;
+        text-align: justify;
+        word-wrap: break-word;
+      }
+
+      /* Inner Matrix Tables */
+      .inner-matrix {
+        width: 100%;
+        border-collapse: collapse;
+        margin: 5px 0;
+      }
+      .inner-matrix th,
+      .inner-matrix td {
+        border: 1px solid #000;
+        padding: 3px 4px;
+        text-align: center;
+        vertical-align: middle;
+      }
+      .inner-matrix th {
+        font-weight: bold;
+      }
+
+      /* List formatting */
+      .list-item {
+        display: table;
+        width: 100%;
+        margin-bottom: 3px;
+      }
+      .list-label {
+        display: table-cell;
+        width: 22px;
+        vertical-align: top;
+      }
+      .list-bullet {
+        display: table-cell;
+        width: 15px;
+        vertical-align: top;
+        text-align: center;
+      }
+      .list-content {
+        display: table-cell;
+        vertical-align: top;
+      }
+
+      ol {
+        padding-left: 20px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+      }
+      ul {
+        padding-left: 20px;
+        margin-top: 5px;
+        margin-bottom: 5px;
+        list-style-type: circle; /* Empty circles for bullet points */
+      }
+
+      /* Heading and bold styling */
+      .bold {
+        font-weight: bold;
+      }
+      .section-title {
+        font-weight: bold;
+        font-size: 13px !important;
+        margin-bottom: 5px;
+      }
+
+      /* Footer styling */
+      .footer-wrapper {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        width: 100%;
+      }
+      .footer-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+      .footer-table td {
+        vertical-align: bottom;
+      }
+      .footer-center p {
+        text-align: center;
+        font-weight: bold;
+      }
+      .footer-center a {
+        color: #0563c1;
+        text-decoration: underline;
+        font-weight: normal;
+      }
+      .page-number p {
+        text-align: right;
+        white-space: nowrap;
+      }
+
+      /* Helper Classes */
+      .full-width {
+        width: 100%;
+      }
+      .mb-10 {
+        margin-bottom: 10px;
+      }
+
+      /* Bordered tables for Page 6 */
+      .bordered-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+      }
+      .bordered-table td {
+        border: 1px solid #000;
+        padding: 8px;
+        vertical-align: top;
+      }
+
+      /* Signature Section Styling */
+      .yours-faithfully-cell {
+        text-align: left;
+        padding: 15px;
+      }
+      .declaration-cell {
+        text-align: left;
+        padding: 15px;
+      }
+      .details-col {
+        width: 50%;
+        padding: 15px;
+        vertical-align: top;
+        line-height: 2.5;
+      }
+      .signature-container {
+        width: 50%;
+        padding: 15px;
+        vertical-align: bottom;
+        position: relative;
+        height: 130px;
+      }
+      .signature-text {
+        position: absolute;
+        top: 50px; /* Pixel-based positioning instead of percentage */
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-weight: bold;
+      }
+      .signature-name {
+        text-align: left;
+        font-weight: bold;
+        margin-top: 100px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page-container">
+      <table class="header-table" border="0" cellpadding="0" cellspacing="0">
+        <tr>
+          <td class="header-left">
+            <p>
+              <img
+                src="images/orange_logo.jpg"
+                alt="Sagarsoft Logo"
+                class="logo-img-left"
+                height="85"
+              />
+              <span class="bank-title-hi">सागरसॉफ्ट</span>
+              <span class="bank-title-en">Sagarsoft</span>
+            </p>
+          </td>
+          <td class="header-right">
+            <p>
+              <img
+                src="images/118_years_logo.jpg"
+                alt="118 Years Trust"
+                class="logo-img-right"
+                height="85"
+                width="200"
+              />
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table class="grid-table">
+        <tbody>
+          <tr>
+            <td class="bold">
+              <p>
+                HO: RECRUIT:
+                <span th:text="${letterNo != null ? letterNo : '-'}"></span>
+              </p>
+              <p style="margin-top: 8px">
+                Reg. No.:
+                <span th:text="${applicationNo != null ? applicationNo : '-'}"
+                  >«registration_no»</span
+                >
+              </p>
+              <p>
+                Roll No.:
+                <span th:text="${registrationNo != null ? registrationNo : '-'}"
+                  >«Roll_No»</span
+                >
+              </p>
+            </td>
+            <td class="bold" style="text-align: right; vertical-align: middle">
+              <p>
+                दिनांक / Date:
+                <span
+                  th:text="${#temporals.format(#temporals.createNow(), 'dd.MM.yyyy')}"
+                  >18.02.2026</span
+                >
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td colspan="2">
+              <p class="bold" style="margin-bottom: 8px">
+                Mr./Ms./Mrs.<span
+                  th:text="${candidateName != null ? candidateName : '-'}"
+                  >«full_name»</span
+                >
+              </p>
+
+              <p>
+                <span class="bold"
+                  th:text="${address1 != null ?
+                            (address1 +
+                            (address2 != null ? ' ' + address2 : '') +
+                            (city != null ? ' ' + city : '') +
+                            (districtName != null ? ', ' + districtName : '') +
+                            (stateName != null ? ', ' + stateName : '') +
+                            (pincode != null ? ' - ' + pincode : ''))
+                            : '-'}"
+                >
+                  «address1»,<br />
+                  «address2», «address3»<br />
+                  «district», «state» - «pincode»
+                </span>
+              </p>
+
+              <table
+                style="
+                  width: 100%;
+                  border: none;
+                  margin-top: 12px;
+                  border-collapse: collapse;
+                "
+              >
+                <tr>
+                  <td style="border: none; padding: 0; width: 50%" class="bold">
+                    <p>
+                      ई मेल/ E-MAIL :
+                      <span th:text="${email != null ? email : '-'}"
+                        >«Mail_ID»</span
+                      >
+                    </p>
+                  </td>
+                  <td
+                    style="
+                      border: none;
+                      padding: 0;
+                      width: 50%;
+                      text-align: right;
+                    "
+                    class="bold"
+                  >
+                    <p>
+                      Caste Category:
+                      <span
+                        th:text="${categoryCode != null ? categoryCode : '-'}"
+                        >«category_name»</span
+                      >
+                    </p>
+                  </td>
+                </tr>
+                <tr>
+                  <td style="border: none; padding: 0" class="bold">
+                    <p>
+                      फोन नं/ Phone No:
+                      <span th:text="${contactNo != null ? contactNo : '-'}"
+                        >«mobile»</span
+                      >
+                    </p>
+                  </td>
+                  <td
+                    style="border: none; padding: 0; text-align: right"
+                    class="bold"
+                  >
+                    <p>
+                      Selected Category:
+                      <span
+                        th:text="${allotedCategory != null ? allotedCategory : '-'}"
+                        >«ALLOTED_CATEGORY»</span
+                      >
+                    </p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <tr>
+            <td><p>प्रिय महोदय /महोदया,</p></td>
+            <td><p>Dear Sir / Madam,</p></td>
+          </tr>
+          <tr>
+            <td class="bold">
+              <p>
+                विषयः सागरसॉफ्ट में
+                <span
+                  th:text="${hindiJobGradeCode != null ? hindiJobGradeCode : '-'}"
+                >
+                  वे.-I
+                </span>
+                <span
+                  th:text="${hindiPositionName != null ? hindiPositionName : '-'}"
+                  >प्रोबेशनरी ऑफिसर</span
+                >
+                के रूप में आपकी नियुक्ति
+              </p>
+            </td>
+            <td class="bold">
+              <p>
+                Re:
+                <u
+                  >Your appointment as
+                  <span th:text="${positionName != null ? positionName : '-'}"
+                    >Probationary Officer</span
+                  >
+                  in
+                  <span th:text="${jobGradeCode != null ? jobGradeCode : '-'}">
+                    (JMG/S-I)
+                  </span>
+                  in Sagarsoft</u
+                >
+              </p>
+            </td>
+          </tr>
+          <tr>
+            <td class="bold">
+              <p>आपको बधाई एवं सागरसॉफ्ट परिवार में आपका स्वागत है!</p>
+            </td>
+            <td class="bold">
+              <p>Congratulations and welcome to Sagarsoft Family!</p>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">1.</p>
+                <p class="list-content">
+                  हम
+                  <span
+                    class="bold"
+                    th:text="${requisitionTitle != null ? requisitionTitle : '-'}"
+                    >CRP PO/MT XV</span
+                  >
+                  के तहत प्रोबेशनरी ऑफ़िसर के पद के लिए आपके IBPS एप्लीकेशन और
+                  उसके बाद हमारे बैंक में प्रोविजनल अलॉटमेंट को देखते हैं।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">1.</p>
+                <p class="list-content">
+                  We refer to your IBPS application for the post of Probationary
+                  Officer under
+                  <span
+                    class="bold"
+                    th:text="${requisitionTitle != null ? requisitionTitle : '-'}"
+                    >CRP PO/MT XV</span
+                  >
+                  and subsequent provisional allotment to our Bank.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">2.</p>
+                <p class="list-content">
+                  हमें आपको  <span class="bold"
+                        th:text="${hindiJobGradeCode != null ? hindiJobGradeCode : '-'}"
+                >
+                  वे.-I
+                </span>ग्रेड/स्केल । में
+                  <span class="bold"
+                    th:text="${hindiPositionName != null ? hindiPositionName : '-'}"
+                    >प्रोबेशनरी ऑफिसर</span
+                  >
+                  के पद पर नियुक्ति प्रदान करते हुए प्रसन्नता हो रही है, आपको
+                  ₹<span class="bold"
+                    th:text="${jobGradeMinSalary != null ? jobGradeMinSalary : '-'}"
+                  >
+                    48,480 </span
+                  >/- प्रतिमाह का मूल वेतन तथा समय-समय पर यथास्वीकार्य महंगाई
+                  भत्ता एवं अन्य भत्ते, सागरसॉफ्ट अधिकारी सेवा विनियम 1979
+                  के अनुसार दिये जायेंगे।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">2.</p>
+                <p class="list-content">
+                  We are pleased to offer you appointment as
+                  <span
+                    class="bold"
+                    th:text="${positionName != null ? positionName : '-'}"
+                    >Probationary Officer</span
+                  >
+                  in
+                  <span class="bold" th:text="${jobGradeCode != null ? jobGradeCode : '-'}">
+                    Junior Management Grade/Scale-I (JMG/S-I)
+                  </span>
+                  , with a basic pay of
+                  <span class="bold"
+                    th:text="${jobGradeMinSalary != null ? jobGradeMinSalary : '-'}"
+                  >
+                    48,480 </span
+                  >/- p.m. plus dearness allowance & other allowances, as may be
+                  admissible from time to time, as per Sagarsoft Officers'
+                  Service Regulations, 1979.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">3.</p>
+                <p class="list-content">
+                  आपको नीचे दिए गए विवरण के अनुसार सर्विस बांड भरना होगा:<br /><br /><span
+                    class="bold"
+                    >"सेवा में शामिल होने के बाद बैंक में न्यूनतम 3 वर्ष की अवधि
+                    के लिए सेवारत रहना या इसके बदले में ₹ 5.00 लाख की राशि का
+                    भुगतान करना" ।</span
+                  ><br /><br />आप कृपया, जहां ड्यूटी ज्वाइन कर रहे हैं, उस राज्य
+                  में लागू स्टांप ड्यूटी के अनुसार विधिवत नोटरी करते हुए बांड
+                  निष्पादित करें। यह बांड पैरा 22 में दर्शाए गए आपके रिपोर्ट
+                  करने की तारीख तक संबंधित प्राधिकारी को प्रस्तुत करना चाहिए।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">3.</p>
+                <p class="list-content">
+                  You will have to execute a Service Bond, the details of which
+                  are as under:<br /><br /><span class="bold"
+                    >"Serve for a minimum period of -3- years in the Bank after
+                    joining the services or in lieu thereof to pay an amount of
+                    ₹5.00 Lakhs"</span
+                  >.<br /><br />Please execute the Bond as per the Stamp Duty
+                  applicable in the State, where you are joining for duty, duly
+                  notarized. The Bond should be submitted to the Authority
+                  concerned on the date of your reporting mentioned at para 22.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">4.</p>
+                <p class="list-content">
+                  आपकी प्रारंभिक पोस्टिंग की जानकारी, आपको इंडक्शन ट्रेनिंग के
+                  दौरान दी जाएगी। अतः इंडक्शन ट्रेनिंग प्रोग्राम पूरा होने पर
+                  आपको बताये गए अंचल कार्यालय / क्षेत्रीय कार्यालय में रिपोर्ट
+                  करना होगा।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">4.</p>
+                <p class="list-content">
+                  Your initial place of posting will be informed during the
+                  Induction Training. Hence, on completion of the Induction
+                  training program, you would be required to report to the given
+                  Zonal Office/ Regional Office for further deployment.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">5.</p>
+                <p class="list-content">
+                  आप बैंक द्वारा उसके पूर्ण विवेक पर बैंक की किसी भी
+                  शाखाओं/कार्यालयों या भारत में किसी भी स्थान पर स्थानांतरित किए
+                  जाने के लिए उत्तरदायी हैं।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">5.</p>
+                <p class="list-content">
+                  You are liable to be transferred by the Bank at its absolute
+                  discretion to any of the branches / offices of the Bank or to
+                  any place in India.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">6.</p>
+                <p class="list-content">
+                  आप कार्यभार ग्रहण की तारीख से 1 वर्ष की अवधि के लिए परिवीक्षा
+                  पर रहेंगे। यह परिवीक्षा अवधि बैंक के पूर्ण विवेक पर अधिकतम एक
+                  वर्ष तक के लिए बढ़ायी जा सकती है। आप बैंक सेवा में स्थायी
+                  होंगे, बशर्तेः<br />क. आपकी परिवीक्षा अवधि संतोषजनक पूर्ण हो
+                  ।<br />ख. आपके द्वारा पैरा 10 और 12/13/14 में विनिर्दिष्ट
+                  अनुबंधों, यदि लागू हों, को पूर्ण किया गया हो।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">6.</p>
+                <p class="list-content">
+                  You will be on probation for a period of -1- year from the
+                  date of joining. The said period of probation may be extended
+                  by the Bank in its absolute discretion for a further period
+                  not exceeding one year. You will be confirmed in Bank's
+                  service, subject to:<br />a. Satisfactory completion of the
+                  probation period.<br />b. Satisfying the stipulations
+                  contained in para 10 and 12/13/14, if applicable.
+                </p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="text-align: right; margin-top: 5px">
+        <p>Page <b>1</b> of <b>6</b></p>
+      </div>
+
+      <div class="footer-wrapper">
+        <table class="footer-table" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="width: 15%"></td>
+            <td style="width: 70%" class="footer-center">
+              <p>
+                प्रधान कार्यालय, मानव संसाधन विभाग, सागरसॉफ्ट भवन बड़ौदा – 390007-
+                भारत
+              </p>
+              <p>
+                Head Office, HRM Department, Sagarsoft Bhavan, Alkapuri,
+                Baroda-390007 - India
+              </p>
+            </td>
+            <td style="width: 15%"></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="page-container">
+      <table class="header-table" border="0" cellpadding="0" cellspacing="0">
+        <tr>
+          <td class="header-left">
+            <p>
+              <img
+                src="images/orange_logo.jpg"
+                alt="Sagarsoft Logo"
+                class="logo-img-left"
+                height="85"
+              />
+              <span class="bank-title-hi">सागरसॉफ्ट</span>
+              <span class="bank-title-en">Sagarsoft</span>
+            </p>
+          </td>
+          <td class="header-right">
+            <p>
+              <img
+                src="images/118_years_logo.jpg"
+                alt="118 Years Trust"
+                class="logo-img-right"
+                height="85"
+                width="200"
+              />
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table
+        class="sub-header-table"
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+      >
+        <tr>
+          <td class="sub-header-left"></td>
+          <td class="sub-header-right">
+            <p>
+              REG. NO.:
+              <span th:text="${applicationNo != null ? applicationNo : '-'}"
+                >&lt;&lt;registration_no&gt;&gt;</span
+              >
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table class="grid-table">
+        <tbody>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label"></p>
+                <p class="list-content">
+                  ग. बैंक द्वारा अधिकारियों के लिए निर्धारित स्थायीकरण प्रक्रिया
+                  / दिशानिर्देशों के अनुसार योग्य पाए गए हों ।<br />घ. आपका
+                  चरित्र एवं पूर्ववृत्त संतोषजनक पाए गए हों।<br />ङ. प्रोबेशन
+                  अवधि के दौरान आयोजित सेवाकालीन प्रशिक्षण-परीक्षाएं उत्तीर्ण
+                  करने के अध्यधीन है।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label"></p>
+                <p class="list-content">
+                  c. Eligibility in terms of the process/guidelines of the Bank
+                  related to confirmation of Officers.<br />d. Satisfactory
+                  verification of your character & antecedents.<br />e. Passing
+                  the in-service tests to be conducted during the probation
+                  period.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">7.</p>
+                <p class="list-content">
+                  आपको, बैंक सेवा में स्थायी होने से पूर्व आपकी मातृभाषा के
+                  अलावा किसी एक भाषा में परीक्षा भी उत्तीर्ण करनी पड़ सकती है।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">7.</p>
+                <p class="list-content">
+                  You may also be required to pass a test in a language other
+                  than your mother tongue before you are confirmed in the Bank's
+                  service.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">8.</p>
+                <p class="list-content">
+                  परिवीक्षा अथवा परिवीक्षा की बढ़ी हुई अवधि, यदि कोई हो, के
+                  दौरान और जब तक कि आपको लिखित रूप में बैंक की सेवा में स्थायी
+                  होने की स्पष्ट सूचना नहीं मिलती है, आपकी सेवाएं एक माह के
+                  नोटिस अथवा उसकी एवज में एक माह की परिलब्धियों का भुगतान करके
+                  समाप्त की जा सकती है।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">8.</p>
+                <p class="list-content">
+                  During the period of probation or extended period of
+                  probation, if any, and until you are expressly confirmed in
+                  the service of the Bank in writing, your services are liable
+                  to be terminated by one month's notice or payment of one
+                  month's emoluments in lieu thereof.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">9.</p>
+                <p class="list-content">
+                  यदि आप परिवीक्षा अवधि के दौरान अथवा स्थायी होने के पश्चात बैंक
+                  की सेवा को छोड़ने के इच्छुक हों तो आपको पैरा 3 में उल्लिखित
+                  बांड राशि के भुगतान के अलावा बैंक को तीन माह का लिखित नोटिस
+                  देना अपेक्षित होगा।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">9.</p>
+                <p class="list-content">
+                  If you desire to leave the service of the Bank, either during
+                  the period of probation or after confirmation, you shall be
+                  required to give three months' notice in writing to the Bank
+                  in addition to the payment of Bond money as mentioned in para
+                  3.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">10.</p>
+                <div class="list-content">
+                  <p>आपकी नियुक्ति निम्नलिखित के अध्यधीन अनंतिम हैः-</p>
+                  <ol type="i">
+                    <li>
+                      आप IBPS विज्ञापन के दिनांक
+                      <span
+                        class="bold"
+                        th:text="${requisitionStartDate != null ? requisitionStartDate : '-'}"
+                        >01.07.2025</span
+                      >
+                      के अनुसार सभी निर्धारित पात्रता मानदंडों को पूरा करते हैं;
+                      यानी
+                      <span
+                        class="bold"
+                        th:text="${requisitionStartDate != null ? requisitionStartDate : '-'}"
+                        >01.07.2025</span
+                      >
+                      को निर्धारित आयु और
+                      <span
+                        class="bold"
+                        th:text="${requisitionCutoffDate != null ? requisitionCutoffDate : '-'}"
+                        >21.07.2025</span
+                      >
+                      को शैक्षणिक योग्यता।
+                    </li>
+                    <li>आपका मेडिकल दृष्टि से स्वस्थ पाया जाना</li>
+                    <li>कार्य अनुभव प्रमाण पत्र की सही पुष्टि होना, यदि कोई</li>
+                    <li>
+                      सत्यापन पत्र की धारा (12) के अनुसार आपके संतोषजनक
+                      पूर्ववर्ती
+                    </li>
+                    <li>
+                      यदि आप केंद्र सरकार के अखिल भारतीय सेवा समूह ए के अधिकारी
+                      हैं या केंद्र सरकार के स्वामित्व या नियंत्रण वाले अन्य
+                      संगठनों में समकक्ष हैं, तो विजिलेंस क्लियरेंस,
+                      आवश्यक्तानुसार।
+                    </li>
+                    <li>
+                      ज्वाइनिंग से पूर्व आपके बायोमेट्रिक की सही पुष्टि होना, और
+                    </li>
+                    <li>
+                      निम्नलिखित दस्तावेजों / प्रमाणपत्रों की फोटोकॉपियों
+                      (विधिवत स्व-अनुप्रमाणित) के -2- सेट जमा किया जाना जिन्हें
+                      कार्यग्रहण हेतु रिपोर्टिंग के दिन
+                      <span class="bold">मूल प्रमाणपत्र</span> के साथ सत्यापित
+                      किया जाएगाः
+                      <ul>
+                        <li>
+                          सिबिल स्कोर की प्रति (न्यूनतम 680 या उससे अधिक का
+                          स्कोर)
+                        </li>
+                        <li>
+                          प्रत्येक वर्ष / सत्र की अंक तालिका के साथ आपकी
+                          शैक्षणिक योग्यताओं यथा डिग्री/ स्नातकोत्तर तकनीकी एवं
+                          पेशेवर योग्यताओं के समर्थन में प्रमाणपत्र.
+                        </li>
+                        <li>
+                          जन्म तारीख का साक्ष्य (जन्म प्रमाणपत्र या जन्म तारीख
+                          के साथ एसएसएलसी / कक्षा दसवीं का प्रमाणपत्र)
+                        </li>
+                        <li>
+                          अनु.जा/अनु.ज.जा./अ.पि.वर्ग/ आर्थिक रूप से कमजोर वर्ग
+                          श्रेणी में होने की स्थिति में भारत सरकार द्वारा यथा
+                          निर्धारित प्रपत्र में सक्षम प्राधिकारी द्वारा जारी
+                          जाति प्रमाणपत्र.
+                        </li>
+                      </ul>
+                    </li>
+                  </ol>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">10.</p>
+                <div class="list-content">
+                  <p>Your appointment is provisional subject to: -</p>
+                  <ol type="i">
+                    <li>
+                      Your fulfilling all the prescribed eligibility criteria in
+                      terms of the IBPS advertisement dated
+                      <span
+                        class="bold"
+                        th:text="${requisitionStartDate != null ? requisitionStartDate : '-'}"
+                        >01.07.2025</span
+                      >; i.e. prescribed age as on
+                      <span
+                        class="bold"
+                        th:text="${requisitionCutoffDate!= null ? requisitionCutoffDate : '-'}"
+                        >01.07.2025</span
+                      >
+                      and educational qualification as on
+                      <span
+                        class="bold"
+                        th:text="${requisitionCutoffDate != null ? requisitionCutoffDate : '-'}"
+                        >21.07.2025</span
+                      >
+                    </li>
+                    <li>Your being found medically fit.</li>
+                    <li>
+                      Satisfactory verification of your work experience
+                      certificates, if any.
+                    </li>
+                    <li>
+                      Your satisfactory antecedent, as per clause (12) of the
+                      attestation form.
+                    </li>
+                    <li>
+                      Vigilance Clearance in case you are an All India Services
+                      Group A officer of the Central Government or equivalent in
+                      other organisations owned or controlled by the Central
+                      Govt., if required.
+                    </li>
+                    <li>
+                      Satisfactory biometric verification before joining, and
+                    </li>
+                    <li>
+                      Submission of -2- sets of photocopies (duly self-attested)
+                      of the following documents/ certificates, which will be
+                      verified with the
+                      <span class="bold">original certificates</span> on the day
+                      of reporting for joining:
+                      <ul>
+                        <li>
+                          Copy of CIBIL Score (minimum score of 680 or above).
+                        </li>
+                        <li>
+                          Certificates in support of your educational
+                          qualifications, i.e. Degree/Post Graduation/ Technical
+                          & Professional qualifications, along with mark sheets
+                          for each year/semester.
+                        </li>
+                        <li>
+                          Proof of Date of Birth (Birth Certificate or SSLC/Std.
+                          X Certificate with DOB).
+                        </li>
+                        <li>
+                          Caste Certificate issued by competent authority,
+                          strictly in the prescribed format as stipulated by
+                          Government of India, in case of SC/ST/OBC/EWS category
+                          candidates.
+                        </li>
+                      </ul>
+                    </li>
+                  </ol>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="text-align: right; margin-top: 5px">
+        <p>Page <b>2</b> of <b>6</b></p>
+      </div>
+
+      <div class="footer-wrapper">
+        <table class="footer-table" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="width: 15%"></td>
+            <td style="width: 70%" class="footer-center">
+              <p>
+                प्रधान कार्यालय, मानव संसाधन विभाग, सागरसॉफ्ट भवन बड़ौदा – 390007-
+                भारत
+              </p>
+              <p>
+                Head Office, HRM Department, Sagarsoft Bhavan, Alkapuri,
+                Baroda-390007 - India
+              </p>
+            </td>
+            <td style="width: 15%"></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="page-container">
+      <table class="header-table" border="0" cellpadding="0" cellspacing="0">
+        <tr>
+          <td class="header-left">
+            <p>
+              <img
+                src="images/orange_logo.jpg"
+                alt="Sagarsoft Logo"
+                class="logo-img-left"
+                height="85"
+              />
+              <span class="bank-title-hi">सागरसॉफ्ट</span>
+              <span class="bank-title-en">Sagarsoft</span>
+            </p>
+          </td>
+          <td class="header-right">
+            <p>
+              <img
+                src="images/118_years_logo.jpg"
+                alt="118 Years Trust"
+                class="logo-img-right"
+                height="85"
+                width="200"
+              />
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table
+        class="sub-header-table"
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+      >
+        <tr>
+          <td class="sub-header-left"></td>
+          <td class="sub-header-right">
+            <p>
+              REG. NO.:
+              <span th:text="${applicationNo != null ? applicationNo : '-'}"
+                >&lt;&lt;registration_no&gt;&gt;</span
+              >
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table class="grid-table">
+        <tbody>
+          <tr>
+            <td style="border-top: none">
+              <div class="list-item">
+                <div class="list-label"></div>
+                <div class="list-content">
+                  <ul style="margin-top: 0">
+                    <li>
+                      अन्य पिछड़ा वर्ग से संबंधित उम्मीदवारों के मामले में,
+                      प्रमाणपत्र में विशेष रूप से एक उपबंध होना चाहिए कि
+                      उम्मीदवार भारत सरकार के तहत सिविल पदों और सेवाओं में अन्य
+                      पिछड़े वर्गों के लिए आरक्षण के लाभ से हटाए गए क्रीमी लेयर
+                      वर्ग से संबंधित नहीं है. अन्य पिछड़ा वर्ग जाति प्रमाणपत्र,
+                      जिसमें गैर-क्रीमी लेयर उपबंध शामिल हो, कार्यग्रहण की तारीख
+                      को (उक्त तारीख से पूर्व एक वर्ष के भीतर जारी) वैध होना
+                      चाहिए. प्रमाणपत्र में उल्लिखित जाति का नाम केंद्र सरकार की
+                      सूची / अधिसूचना के साथ अक्षरशः मेल खाना चाहिए.
+                    </li>
+                    <li>
+                      दिव्यांग व्यक्तियों (पीडब्ल्यूडी) की श्रेणी के मामले में
+                      जिला चिकित्सा बोर्ड द्वारा निर्धारित प्रारूप में जारी
+                      दिव्यांग प्रमाणपत्र.
+                    </li>
+                    <li>अनुभव प्रमाणपत्र, यदि कोई</li>
+                    <li>
+                      आपके वर्तमान नियोक्ता से कार्यमुक्ति का आदेश, यदि कोई
+                    </li>
+                    <li>
+                      -2- संतोषजनक रिपोर्ट (चरित्र प्रमाणपत्र) अंतिम बार जिस
+                      संस्थान में अध्ययन किया है (जैसे स्कूल, कॉलेज) उसके
+                      प्रिंसिपल या राजपत्रित अधिकारी द्वारा। रिश्तेदारों से
+                      प्राप्त प्रमाणपत्र स्वीकार नहीं किए जाएंगे।
+                    </li>
+                    <li>
+                      चार (4) पासपोर्ट आकार के फोटो तथा पैन कार्ड एवं आधार कार्ड
+                      की एक प्रति.
+                    </li>
+                  </ul>
+                  <p style="margin-top: 10px; margin-bottom: 10px">
+                    कृपया ध्यान दें कि आपकी नियुक्ति बैंक को आपके द्वारा प्रदान
+                    की गई जानकारी और दस्तावेजों की सत्यता के अधीन है और आपके
+                    द्वारा बैंक को दी गई सभी जानकारी और प्रस्तुत किए गए
+                    दस्तावेजों को इस नियुक्ति के उद्देश्य के लिए महत्वपूर्ण माना
+                    जाएगा प्रमाणपत्रों / दस्तावेज़ों, सूचना, विवरणों, दावों के
+                    असत्य अथवा अपूर्ण पाए जाने की स्थिति में, आपकी सेवाएं मिथ्या
+                    निरुपण / गोपन के आधार पर अर्जित समझकर समाप्त की जा सकती
+                    हैं。
+                  </p>
+                </div>
+              </div>
+            </td>
+            <td style="border-top: none">
+              <div class="list-item">
+                <div class="list-label"></div>
+                <div class="list-content">
+                  <ul style="margin-top: 0">
+                    <li>
+                      In case of candidates belonging to OBC category, the
+                      certificate should specifically contain a clause that the
+                      candidate does not belong to creamy layer section excluded
+                      from the benefits of reservation for Other Backward
+                      Classes in Civil Posts and Services under Government of
+                      India. OBC caste certificate containing the Non-creamy
+                      layer clause should be valid as on the date of joining
+                      (issued within one year prior to the said date). Caste
+                      Name mentioned in the certificate should tally letter by
+                      letter with Central Government list / notification.
+                    </li>
+                    <li>
+                      Disability certificate in prescribed format issued by the
+                      District Medical Board in case of Persons with Disability
+                      (PWD) category.
+                    </li>
+                    <li>Experience certificates, if any.</li>
+                    <li>Relieving order from your present employer, if any.</li>
+                    <li>
+                      -2- Satisfactory reports (character certificate) from the
+                      principal of last institute attended (e.g. school,
+                      college) or from a Gazetted Officer. Certificates from
+                      relatives will not be accepted.
+                    </li>
+                    <li>
+                      Four (4) passport size photographs and a copy of PAN Card
+                      & Aadhaar Card.
+                    </li>
+                  </ul>
+                  <p style="margin-top: 10px; margin-bottom: 10px">
+                    Please note that your appointment is subject to the veracity
+                    of the information and documents provided by you to the
+                    Bank, and all information given by you and documents
+                    submitted by you to the Bank shall be deemed to be material
+                    for the purpose of this appointment. If any of the
+                    representations, statements, claims, details or documents is
+                    found to be false or incomplete; your services are liable to
+                    be terminated as having been secured on misrepresentation/
+                    suppression.
+                  </p>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">11.</p>
+                <p class="list-content">
+                  <span class="bold">पैरा 10</span> में उल्लेखित किसी भी
+                  दस्तावेजों/प्रमाणपत्रों को प्रस्तुत नहीं किए जाने की स्थिति
+                  में, आपको बैंक सेवा में कार्यभार ग्रहण करने की अनुमति नहीं दी
+                  जायेगी |
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">11.</p>
+                <p class="list-content">
+                  In the event of failure to submit any of the
+                  documents/certificates as mentioned in
+                  <span class="bold">para 10</span>, you will not be permitted
+                  to join the Bank's services.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">12.</p>
+                <p class="list-content">
+                  यदि आप अनुसूचित जाति / अनुसूचित जनजाति श्रेणी से संबंधित हैं
+                  तो, बैंक में आपकी यह नियुक्ति अस्थायी है तथा यह जाति/जनजाति
+                  प्रमाणपत्रों की उचित माध्यम से जांच होने के अध्यधीन है और यदि
+                  किसी समय जांच में यह पाया जाता है कि अनुसूचित जाति अथवा
+                  अनुसूचित जनजाति, जैसा भी मामला আসতে है तो आपकी सेवा/ संविदा,
+                  बिना कोई कारण बताये और मिथ्या प्रमाणपत्र प्रस्तुत करने के लिए
+                  आपके खिलाफ़ भारतीय दंड संहिता के प्रावधानों के अन्तर्गत आगे की
+                  जाने वाली ऐसी किसी कार्यवाही हेतु, बगैर किसी पूर्वाग्रह के
+                  तुरंत समाप्त कर दी जाएगी.
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">12.</p>
+                <p class="list-content">
+                  In case you belong to Scheduled Caste/Scheduled Tribe
+                  category, your above said appointment in the Bank is
+                  provisional and is subject to the Caste / Tribe certificate
+                  being verified through the proper channels and if the
+                  verification at any time reveals that your claim to belong to
+                  Scheduled Caste or Scheduled Tribe as the case may be, is
+                  false, your appointment/Contract will be terminated,
+                  forthwith, without assigning any further reasons and without
+                  prejudice to such further action as may be taken under the
+                  provisions of Indian Penal Code for production of false
+                  certificate.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">13.</p>
+                <p class="list-content">
+                  यदि आप अन्य पिछड़ा वर्ग (ओबीसी) श्रेणी से संबंधित हैं तो, बैंक
+                  में आपकी यह नियुक्ति अस्थायी है और यह उचित माध्यम से समुदाय
+                  प्रमाणपत्र की जांच करने के अध्यधीन है. यदि सत्यापन के दौरान यह
+                  पाया जाता है कि आप अन्य पिछड़ा वर्ग से संबंधित हैं किंतु
+                  क्रीमी लेअर के अंतर्गत आते हैं और/या आपकी जाति केंद्रीय सूची
+                  में नहीं दर्शाई गई है और अन्य पिछड़ा वर्ग श्रेणी के लिए आपका
+                  दावा असत्य है, तो आपकी सेवा/ संविदा बिना कोई कारण बताए और
+                  मिथ्या प्रमाणपत्र प्रस्तुत करने के लिए भारतीय दंड संहिता के
+                  प्रावधानों के अंतर्गत, आगे की जानेवाली ऐसी किसी कार्यवाही
+                  हेतु, बगैर किसी पूर्वाग्रह के तुरंत समाप्त कर दी जाएगी.
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">13.</p>
+                <p class="list-content">
+                  In case you belong to Other Backward Classes (OBC) category,
+                  your above said appointment is provisional and is subject to
+                  the community certificate being verified through the proper
+                  channels. If the verification reveals that you belong to Other
+                  Backward Classes but coming under creamy layer and/or if your
+                  caste does not find mention in the Central List and your claim
+                  to belong to OBC category is false, your appointment/Contract
+                  will be terminated forthwith, without assigning any further
+                  reasons and without prejudice to such further action, as may
+                  be taken under the provisions of the Indian Penal Code for
+                  production of false certificate.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">14.</p>
+                <p class="list-content">
+                  यदि आप आर्थिक रूप से कमजोर वर्ग (ईडब्ल्यूएस) श्रेणी से संबंधित
+                  हैं तो, आपकी नियुक्ति अस्थायी है और यह उचित माध्यम से आय एवं
+                  आस्ति प्रमाणपत्र की जांच करने के अध्यधीन है. यदि सत्यापन के
+                  दौरान यह पाया
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">14.</p>
+                <p class="list-content">
+                  In case you belong to Economically Weaker Section (EWS)
+                  Category, your above said appointment is provisional and is
+                  subject to the Income and asset
+                </p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="text-align: right; margin-top: 5px">
+        <p>Page <b>3</b> of <b>6</b></p>
+      </div>
+
+      <div class="footer-wrapper">
+        <table class="footer-table" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="width: 15%"></td>
+            <td style="width: 70%" class="footer-center">
+              <p>
+                प्रधान कार्यालय, मानव संसाधन विभाग, सागरसॉफ्ट भवन बड़ौदा – 390007-
+                भारत
+              </p>
+              <p>
+                Head Office, HRM Department, Sagarsoft Bhavan, Alkapuri,
+                Baroda-390007 - India
+              </p>
+            </td>
+            <td style="width: 15%"></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="page-container">
+      <table class="header-table" border="0" cellpadding="0" cellspacing="0">
+        <tr>
+          <td class="header-left">
+            <p>
+              <img
+                src="images/orange_logo.jpg"
+                alt="Sagarsoft Logo"
+                class="logo-img-left"
+                height="85"
+              />
+              <span class="bank-title-hi">सागरसॉफ्ट</span>
+              <span class="bank-title-en">Sagarsoft</span>
+            </p>
+          </td>
+          <td class="header-right">
+            <p>
+              <img
+                src="images/118_years_logo.jpg"
+                alt="118 Years Trust"
+                class="logo-img-right"
+                height="85"
+                width="200"
+              />
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table
+        class="sub-header-table"
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+      >
+        <tr>
+          <td class="sub-header-left"></td>
+          <td class="sub-header-right">
+            <p>
+              REG. NO.:
+              <span th:text="${applicationNo != null ? applicationNo : '-'}"
+                >&lt;&lt;registration_no&gt;&gt;</span
+              >
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table class="grid-table">
+        <tbody>
+          <tr>
+            <td style="border-top: none">
+              <div class="list-item">
+                <p class="list-label"></p>
+                <p class="list-content">
+                  जाता है कि आर्थिक रूप से कमजोर वर्ग (ईडब्ल्यूएस) के लिए आपका
+                  दावा गलत/असत्य है, तो आपकी सेवा बिना कोई कारण बताए और मिथ्या
+                  प्रमाणपत्र प्रस्तुत करने के लिए भारतीय दंड संहिता के
+                  प्रावधानों के अंतर्गत, आगे की जानेवाली ऐसी किसी कार्यवाही
+                  हेतु, बगैर किसी पूर्वाग्रह के तुरंत समाप्त कर दी जाएगी.
+                </p>
+              </div>
+            </td>
+            <td style="border-top: none">
+              <div class="list-item">
+                <p class="list-label"></p>
+                <p class="list-content">
+                  certificate being verified through the proper channels and if
+                  the verification reveals that the claim to belong to EWS is
+                  fake/false the services will be terminated forthwith without
+                  assigning any further reasons and without prejudice to such
+                  further action as may be taken under the provisions of the
+                  Indian Penal Code for production of fake/false certificate.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">15.</p>
+                <p class="list-content">
+                  यदि आप एक भूतपूर्व सैनिक हैं, तो वेतन का निर्धारण समय-समय पर
+                  जारी, अद्यतन या संशोधित बैंक के दिशानिर्देशों के अनुसार किया
+                  जाएगा.<br /><br />सिविल संस्थान होने के नाते पिछली सेवा के
+                  दौरान भूतपूर्व सैनिकों के लिए स्वीकार्य मिलिट्री स्पेशल पे
+                  (एमएसपी) के घटक को प्रारंभिक प्रस्ताव के स्तर पर या उसके बाद
+                  किसी भी स्तर पर वेतन के निर्धारण के लिए शामिल नहीं किया
+                  जाएगा.<br /><br />यह स्पष्ट किया जाता है कि डिस्चार्ज की तारीख
+                  और / या बैंक की सेवा में प्रारंभिक नियुक्ति की तारीख के पश्चात
+                  सशस्त्र बलों की पिछली सेवा में वेतन / परिलब्धियों में कोई भी
+                  संशोधन बैंक में प्राप्य वेतन / परिलब्धियों के लिए पात्रता हेतु
+                  लागू नहीं होगा और बैंक में यथास्वीकार्य वेतन/ परिलब्धियों में
+                  तदनुरूप संशोधन के लिए किसी भी दावे पर विचार नहीं किया जाएगा
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">15.</p>
+                <p class="list-content">
+                  In case you are an Ex-Servicemen, the fixation of pay shall be
+                  done in accordance with guidelines of the Bank as issued,
+                  updated or revised from time to time.<br />Being a civil
+                  organization, the component of Military Special Pay (MSP) as
+                  admissible to Ex-Servicemen during previous employment, shall
+                  not be included for fixation of pay at the stage of initial
+                  offer or at any stage thereafter.<br /><br />It is clarified
+                  that, any revision of pay / emoluments that takes place in the
+                  previous employment in the Armed Forces, after the date of
+                  discharge and/or date of initial appointment in the service of
+                  the Bank, shall remain inconsequential to the entitlements for
+                  pay/emoluments receivable in the Bank and no claim whatsoever,
+                  shall be entertained for corresponding revision of pay /
+                  emolument as admissible in the Bank.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">16.</p>
+                <p class="list-content">
+                  आप सागरसॉफ्ट अधिकारी सेवा विनियम, 1979, सागरसॉफ्ट
+                  अधिकारी कर्मचारी (आचरण) विनियम, 1976, सागरसॉफ्ट अधिकारी
+                  कर्मचारी (अनुशासन एवं अपील) विनियम, 1976, सागरसॉफ्ट
+                  अधिकारी कर्मचारी (सेवानिवृत्ति पश्चात प्राइवेट सेक्टर
+                  संस्थानों में नौकरी की स्वीकृति) विनियम, 2001 और बैंक द्वारा
+                  समय-समय पर अपने अधिकारियों के लिए संशोधित एवं निरुपित किये गए
+                  अन्य नियमों एवं विनियमों के प्रावधानों द्वारा आवद्ध होंगे।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">16.</p>
+                <p class="list-content">
+                  You will be bound by the provisions of Sagarsoft
+                  Officers' Service Regulations, 1979, Sagarsoft Officer
+                  Employees' (Conduct) Regulations, 1976, Sagarsoft Officer
+                  Employees' (Discipline & Appeal) Regulations, 1976; Sagarsoft Officer Employees' (Acceptance of Jobs in Private
+                  Sector Concerns after Retirement) Regulations, 2001 and other
+                  rules and regulations, as modified and formulated by the Bank
+                  for its Officers from time to time.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">17.</p>
+                <p class="list-content">
+                  कृपया नोट करें कि आप निर्धारित अंशदायी पेंशन योजना के
+                  प्रावधानों के अधीन होंगे, जो वर्तमान मे नेशनल पेंशन सिस्टम के
+                  नाम से जाना जाता है, जो समय-समय पर संशोधित किए जा सकते हैं.
+                  राष्ट्रीय पेंशन योजना के तहत समय से पहले निकासी और निकासी के
+                  संबंध में सभी मामले समय-समय पर संशोधित "पेंशन फंड नियामक और
+                  विकास प्राधिकरण (पीएफआरडीए) विनियम, 2015" द्वारा शासित
+                  होंगे।<br />यह भी स्पष्ट किया जाता है कि आप बैंक की पी.एफ.
+                  योजना में शामिल होने के पात्र नहीं होंगे और आप निर्धारित लाभ
+                  पेंशन योजना [सागरसॉफ्ट (कर्मचारी) पेंशन विनियम, 1995] के
+                  सदस्य भी नहीं बन सकेंगे।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">17.</p>
+                <p class="list-content">
+                  Please note that you will be bound by the provisions of
+                  Defined Contributory Pension Scheme, presently known as
+                  National Pension Scheme, as may be amended from time to
+                  time.<br />All cases with regard to Premature Exits &
+                  Withdrawals under the National Pension Scheme will be governed
+                  by Pension Fund Regulatory and Development Authority (PFRDA)
+                  Regulations 2015", as amended from time to time.<br />It is
+                  also clarified that you shall not be entitled to join the P.F.
+                  Scheme of the Bank and you will also not be a member of the
+                  Defined Benefit Pension Scheme [Sagarsoft (Employees')
+                  Pension Regulations, 1995].
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">18.</p>
+                <p class="list-content">
+                  आप बैंक और उसके ग्राहकों के साथ कार्य व्यवहार के बारे में
+                  गोपनीयता का सख्ती से अनुपालन करने के लिए आबद्ध होंगे।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">18.</p>
+                <p class="list-content">
+                  You will be bound to observe strict secrecy in regard to the
+                  dealings of the Bank and its customers.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">19.</p>
+                <p class="list-content">
+                  आप बैंक की सेवाओं से सेवानिवृत्त उस महीने के अंतिम दिन होंगे,
+                  जिस महीने में आप सेवानिवृत्ति की आयु को पूरा करते हैं. तथापि,
+                  यदि आपकी जन्मतिथि महीने के प्रथम दिन पड़ती है, तो आप पिछले
+                  महीने के अंतिम कार्य दिवस पर सेवानिवृत्त होंगे।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">19.</p>
+                <p class="list-content">
+                  You shall retire from the Bank's services on the last day of
+                  the month in which you complete the age of superannuation.
+                  However, if your date of birth happens to be the 1st day of
+                  the month, you shall retire on the last working day of the
+                  preceding month.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">20.</p>
+                <p class="list-content">
+                  इस नियुक्ति के तहत बैंक सेवा में शामिल होने से पहले आपको एक
+                  मेडिकल
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">20.</p>
+                <p class="list-content">
+                  You shall be required to undergo a medical examination prior
+                  to your joining the Bank's
+                </p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="text-align: right; margin-top: 5px">
+        <p>Page <b>4</b> of <b>6</b></p>
+      </div>
+
+      <div class="footer-wrapper">
+        <table class="footer-table" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="width: 15%"></td>
+            <td style="width: 70%" class="footer-center">
+              <p>
+                प्रधान कार्यालय, मानव संसाधन विभाग, सागरसॉफ्ट भवन बड़ौदा – 390007-
+                भारत
+              </p>
+              <p>
+                Head Office, HRM Department, Sagarsoft Bhavan, Alkapuri,
+                Baroda-390007 - India
+              </p>
+            </td>
+            <td style="width: 15%"></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="page-container">
+      <table class="header-table" border="0" cellpadding="0" cellspacing="0">
+        <tr>
+          <td class="header-left">
+            <p>
+              <img
+                src="images/orange_logo.jpg"
+                alt="Sagarsoft Logo"
+                class="logo-img-left"
+                height="85"
+              />
+              <span class="bank-title-hi">सागरसॉफ्ट</span>
+              <span class="bank-title-en">Sagarsoft</span>
+            </p>
+          </td>
+          <td class="header-right">
+            <p>
+              <img
+                src="images/118_years_logo.jpg"
+                alt="118 Years Trust"
+                class="logo-img-right"
+                height="85"
+                width="200"
+              />
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table
+        class="sub-header-table"
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+      >
+        <tr>
+          <td class="sub-header-left"></td>
+          <td class="sub-header-right">
+            <p>
+              REG. NO.:
+              <span th:text="${applicationNo != null ? applicationNo : '-'}"
+                >&lt;&lt;registration_no&gt;&gt;</span
+              >
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table class="grid-table">
+        <tbody>
+          <tr>
+            <td style="border-top: none">
+              <div class="list-item">
+                <p class="list-label"></p>
+                <p class="list-content">
+                  जांच करवानी होगी, जो बैंक सेवा में शामिल होने के लिए आपकी
+                  योग्यता का प्रमाण होगा।<br />अपनी मेडिकल जांच के लिए, कृपया
+                  <span
+                    class="bold"
+                    th:text="${medicalTestDate != null ? medicalTestDate : '-'}"
+                    >27-02-2026</span
+                  >
+                  को निम्नलिखित पते पर प्राधिकरण से संपर्क करना होगा, जो इसकी
+                  व्यवस्था करेंगे।<br />कृपया ध्यान दें कि मेडिकल जांच का खर्च
+                  आपको ही वहन करना होगा।
+                </p>
+              </div>
+            </td>
+            <td style="border-top: none">
+              <div class="list-item">
+                <p class="list-label"></p>
+                <p class="list-content">
+                  services under this appointment as testimony of your fitness
+                  to join the Bank's service.<br />For the purpose of your
+                  medical examination, please contact the Authority at the
+                  following address on
+                  <span
+                    class="bold"
+                    th:text="${medicalTestDate != null ? medicalTestDate : '-'}"
+                    >27-02-2026</span
+                  >, who will arrange for the same.<br />Please note that the
+                  expenses for medical examination shall be borne by you:
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td
+              colspan="2"
+              class="bold"
+              style="text-align: center; padding: 10px"
+            >
+              <span
+                th:text="${(medicalCentre != null or medicalState != null) ? ((medicalCentre != null ? medicalCentre : '') + (medicalCentre != null and medicalState != null ? ', ' : '') + (medicalState != null ? medicalState : '')) : '-'}"
+                >&lt;&lt;Medical Address&gt;&gt;</span
+              >
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">21.</p>
+                <p class="list-content">
+                  उपर्युक्त प्राधिकारी को रिपोर्ट करते समय कृपया अपनी पहचान के
+                  साक्ष्य के साथ इस प्रस्ताव पत्र की प्रति प्रस्तुत करें.
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">21.</p>
+                <p class="list-content">
+                  While reporting to the above authority, please submit a copy
+                  of this offer letter along with your identity proof.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">22.</p>
+                <p class="list-content">
+                  चिकित्सकीय रूप से स्वस्थ पाए जाने पर, आपको अपने
+                  प्रमाणपत्रों/दस्तावेजों के सत्यापन सहित अपनी जॉइनिंग
+                  औपचारिकताओं को पूरा करने और इंडक्शन ट्रेनिंग के लिए
+                  <span
+                    class="bold"
+                    th:text="${joiningDate != null ? joiningDate : '-'}"
+                    >09-03-2026</span
+                  >
+                  को नीचे दिए गए पते पर प्राधिकारी के पास रिपोर्ट करने की सलाह
+                  दी जाती है:
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">22.</p>
+                <p class="list-content">
+                  On being found medically fit, you are advised to report for
+                  completion of your joining formalities including verification
+                  of your certificates / documents and for Induction Training on
+                  <span
+                    class="bold"
+                    th:text="${joiningDate != null ? joiningDate : '-'}"
+                    >09-03-2026</span
+                  >
+                  to the authority at the address mentioned below:
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td
+              colspan="2"
+              class="bold"
+              style="text-align: center; padding: 10px"
+            >
+              <span
+                th:text="${(jobLocation != null or jobLocationState != null) ? ((jobLocation != null ? jobLocation : '') + (jobLocation != null and jobLocationState != null ? ', ' : '') + (jobLocationState != null ? jobLocationState : '')) : '-'}"
+                >&lt;&lt;Academy_Address&gt;&gt;</span
+              >
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">23.</p>
+                <p class="list-content">
+                  इन औपचारिकताओं को संतोषजनक रूप से पूर्ण करने के पश्चात, बैंक
+                  की सेवा में आपकी नियुक्ति आप, के द्वारा उपरोक्तानुसार रिपोर्ट
+                  करने की तिथि से प्रभावी होगी।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">23.</p>
+                <p class="list-content">
+                  On satisfactory completion of these formalities, your
+                  appointment in the Bank's service will take effect from the
+                  date of your reporting as mentioned above.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">24.</p>
+                <p class="list-content">
+                  आपको ऊपर उल्लिखित औपचारिकताओं को संतोषजनक ढंग से पूरा करने के
+                  उपरांत ऑन-बोर्डिंग कार्यक्रम भेजा जाएगा, जिसकी अनुसूची आपको
+                  आपकी रिपोर्टिंग पर बताई जाएगी。<br />इस ऑन-बोर्डिंग कार्यक्रम
+                  के तहत, आपको बैंक में कक्षा प्रशिक्षण के साथ-साथ विभिन्न
+                  इकाइयों/स्थानों पर प्लेसमेंट को भी पूरा करना होगा जो आपको
+                  विभिन्न बैंकिंग कार्यों पर एक परिप्रेक्ष्य प्रदान करेगा।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">24.</p>
+                <p class="list-content">
+                  You shall undergo an on-boarding programme immediately after
+                  satisfactory completion of the formalities mentioned above,
+                  the schedule of which will be advised to you on your
+                  reporting.<br />Under this on-boarding programme, you would
+                  undergo classroom trainings as well as placements at different
+                  units/ places in the Bank which will provide you a perspective
+                  on different banking operations.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">25.</p>
+                <p class="list-content">
+                  कृपया नोट करें कि बैंक में आपके कार्यग्रहण करने से पूर्व
+                  चिकित्सा जांच हेतु एवं इंडक्शन ट्रेनिंग के लिए रिपोर्टिंग हेतु
+                  यात्रा करने पर, यात्रा व्यय देय नहीं होगा।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">25.</p>
+                <p class="list-content">
+                  Please note that no travelling expenses shall be payable for
+                  the medical examination prior to your joining the Bank or
+                  travelling to the place of reporting for the Induction
+                  Training.
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">26.</p>
+                <div class="list-content">
+                  <p>
+                    आपको ट्रेनिंग सेंटर में जॉइनिंग से एक हफ़्ते पहले हमारे
+                    जॉइनिंग फ़ॉर्म के अनुसार डेटा/जानकारी ऑनलाइन फ़ॉर्मेट में
+                    <span class="bold" style="text-decoration: underline"
+                      >जॉइनिंग से एक हफ़्ते पहले</span
+                    >
+                    जमा करनी होगी, ताकि हम आपकी जॉइनिंग के तुरंत बाद आपकी
+                    एम्प्लॉई डिटेल्स कैप्चर और बना सकें। आप 2 दिन बाद इस लिंक
+                    <a
+                      href="https://bankapps.sagarsoft.co.in/biodatanew/"
+                      style="color: blue; text-decoration: underline"
+                      >https://bankapps.sagarsoft.co.in/biodatanew/</a
+                    >
+                    के ज़रिए यह फ़ॉर्म देख सकते हैं। यह लिंक एक डेटा एंट्री पेज
+                    खोलेगा और उस पेज की सभी एंट्रीज़ ज़रूरी तौर पर भरनी होंगी।
+                    आपको अपनी यूज़र ID
+                    <span class="bold"
+                      >(IBPS रजिस्ट्रेशन नंबर) और पासवर्ड (आपकी जन्मतिथि
+                      DD-MM-YYYY फ़ॉर्मेट में)</span
+                    >
+                    का इस्तेमाल करके लॉगिन करना होगा। कृपया पक्का करें कि जो
+                    डेटा डाला जा रहा है,চেতন वह आपके दूसरे
+                    डिक्लेरेशन/सर्टिफिकेट/क्वालिफिकेशन के अनुसार ही हो。
+                  </p>
+                  <p style="margin-top: 10px">
+                    उक्त फार्मों को पूर्ण करने के पश्चात् आपको 'Submit' का बटन
+                    दबाना होगा जिससे ज्वाइनिंग डाटा का मुद्रणीय पृष्ठ स्वतः
+                    जेनरेट हो जायेगा। आपको इन ज्वाइनिंग फार्मों की 2 मुद्रित
+                    प्रतियों के साथ उक्त <span class="bold">पैरा 22</span> में
+                    किये गये उल्लेखानुसार बैंक के संबद्ध प्राधिकारी के पास
+                    रिपोर्ट करना होगा। आप हस्ताक्षर वाला भाग खाली छोड़ दें
+                    क्योंकि इस पर
+                  </p>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">26.</p>
+                <div class="list-content">
+                  <p>
+                    You are also required to submit data/ information as per our
+                    joining forms in an on-line format
+                    <span class="bold" style="text-decoration: underline"
+                      >one week prior to your joining at the training
+                      centre</span
+                    >, so that we are able to capture and create your employee
+                    particulars immediately on your joining. You can access the
+                    said form after 2 days through this link
+                    <a
+                      href="https://bankapps.sagarsoft.co.in/biodatanew/"
+                      style="color: blue; text-decoration: underline"
+                      >https://bankapps.sagarsoft.co.in/biodatanew/</a
+                    >. This link will open up a data entry page and all the
+                    entries in that page need to be necessarily filled up. You
+                    will be required to login using your User ID
+                    <span class="bold">
+                      <span
+                        th:text="${applicationNo != null ? applicationNo : '-'}"
+                        >(IBPS Registration No.)</span
+                      >
+                      and Password (your Date of birth in DD-MM-YYYY
+                      format)</span
+                    >. Kindly ensure that the data being entered is the same as
+                    per your other declaration/ certificates/ qualifications.
+                  </p>
+                  <p style="margin-top: 10px">
+                    After completing the said forms, you will be required to
+                    press the 'Submit' button which will then auto-generate
+                    printable pages of the joining data. You will be required to
+                    report to the respective authority of the Bank as stated in
+                    <span class="bold">para 22</span> above along with 2 printed
+                    copies of these joining forms. You leave the signature
+                    portion blank as that
+                  </p>
+                </div>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div style="text-align: right; margin-top: 5px">
+        <p>Page <b>5</b> of <b>6</b></p>
+      </div>
+
+      <div class="footer-wrapper">
+        <table class="footer-table" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="width: 15%"></td>
+            <td style="width: 70%" class="footer-center">
+              <p>
+                प्रधान कार्यालय, मानव संसाधन विभाग, सागरसॉफ्ट भवन बड़ौदा – 390007-
+                भारत
+              </p>
+              <p>
+                Head Office, HRM Department, Sagarsoft Bhavan, Alkapuri,
+                Baroda-390007 - India
+              </p>
+            </td>
+            <td style="width: 15%"></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="page-container">
+      <table class="header-table" border="0" cellpadding="0" cellspacing="0">
+        <tr>
+          <td class="header-left">
+            <p>
+              <img
+                src="images/orange_logo.jpg"
+                alt="Sagarsoft Logo"
+                class="logo-img-left"
+                height="85"
+              />
+              <span class="bank-title-hi">सागरसॉफ्ट</span>
+              <span class="bank-title-en">Sagarsoft</span>
+            </p>
+          </td>
+          <td class="header-right">
+            <p>
+              <img
+                src="images/118_years_logo.jpg"
+                alt="118 Years Trust"
+                class="logo-img-right"
+                height="85"
+                width="200"
+              />
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table
+        class="sub-header-table"
+        border="0"
+        cellpadding="0"
+        cellspacing="0"
+      >
+        <tr>
+          <td class="sub-header-left"></td>
+          <td class="sub-header-right">
+            <p>
+              REG. NO.:
+              <span th:text="${applicationNo != null ? applicationNo : '-'}"
+                >&lt;&lt;registration_no&gt;&gt;</span
+              >
+            </p>
+          </td>
+        </tr>
+      </table>
+
+      <table class="grid-table">
+        <tbody>
+          <tr>
+            <td style="border-top: none">
+              <div class="list-item">
+                <div class="list-label"></div>
+                <div class="list-content">
+                  <p>
+                    आपको अपनी रिपोर्टिंग के दिन सत्यापनकर्ता अधिकारी के समक्ष
+                    अपने हस्ताक्षर करने होंगे.
+                  </p>
+                </div>
+              </div>
+            </td>
+            <td style="border-top: none">
+              <div class="list-item">
+                <div class="list-label"></div>
+                <div class="list-content">
+                  <p>
+                    is to be affixed by you in person in front of the verifying
+                    officer on the day of your reporting.
+                  </p>
+                </div>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">27.</p>
+                <p class="list-content">
+                  आप कार्यग्रहण प्रक्रिया के बारे बारे में अपनी किसी भी प्रकार
+                  की पूछताछ का समाधान ऐसे पत्राचारों में अपने रोल नंबर का उल्लेख
+                  करते हुए हमारे कार्यालय के निम्नलिखित नंबर पर संपर्क कर सकते
+                  हैं:<br />
+                  <span class="bold" style="text-decoration: underline"
+                    >भर्ती विभाग के लिए नंः 0265 2316671/51<br />आई टी से
+                    सम्बन्धित / तकनीकी समस्याः 0265 2316652<br />ऐन.पी.ऐस/प्रानः
+                    0265 2316641<br />ई-मेल:
+                    RecruitmentSupport@sagarsoft.com</span
+                  >
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">27.</p>
+                <p class="list-content">
+                  You can address any queries that you may have about your
+                  joining process (mentioning your registration no. in any such
+                  communication) to the following numbers in our Office:<br /><span
+                    class="bold"
+                    style="text-decoration: underline"
+                    >Recruitment Cell No.: 0265 2316671/51<br />IT
+                    Related/Technical Issue: 0265 2316652<br />NPS/PRAN: 0265
+                    2316641<br />E-Mail: RecruitmentSupport@sagarsoft.com
+                  </span>
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">28.</p>
+                <p class="list-content">
+                  यदि उपरोक्त नियम और शर्तें आपको स्वीकार्य हैं, तो कृपया इस
+                  पत्र की प्रति पर अपनी बिना शर्त स्वीकृति लिखित रूप में हमें
+                  सूचित करें और इसकी स्कैन की गई प्रति
+                  <span class="bold">पैरा 26</span> में दिए गए लिंक पर
+                  <span
+                    class="bold"
+                    th:text="${acceptBeforeDate != null ? acceptBeforeDate : '-'}"
+                    >25-02-2026</span
+                  >
+                  को या उससे पहले अपलोड करें।
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">28.</p>
+                <p class="list-content">
+                  If the above terms and conditions are acceptable to you,
+                  please advise us in writing your unconditional acceptance on
+                  the copy of this letter and upload the scanned copy of the
+                  same in the link provided in
+                  <span class="bold">para 26</span> on or before
+                  <span
+                    class="bold"
+                    th:text="${acceptBeforeDate != null ? acceptBeforeDate : '-'}"
+                    >25-02-2026</span
+                  >
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <div class="list-item">
+                <p class="list-label">29.</p>
+                <p class="list-content">
+                  यदि बैंक को निर्धारित अवधि के भीतर शर्तरहित लिखित स्वीकृति
+                  प्राप्त नहीं होती है तो यह माना जाएगा कि आप इस प्रस्ताव को
+                  स्वीकार करने में रुचि नहीं रखते हैं और आपको भेजा गया नियुक्ति
+                  प्रस्ताव स्वतः रद्द माना जायेगा, जब तक कि आपको बैंक की सेवा को
+                  ग्रहण करने की विशेष अनुमति नहीं दी गयी हो.<br />नियुक्ति स्थल
+                  में किसी प्रकार के परिवर्तन और/अथवा नियुक्ति के नियमों एवं
+                  शर्तों में संशोधन से संबंधित किसी भी पत्रव्यवहार पर बैंक
+                  द्वारा ध्यान नहीं दिया जायेगा.
+                </p>
+              </div>
+            </td>
+            <td>
+              <div class="list-item">
+                <p class="list-label">29.</p>
+                <p class="list-content">
+                  If the Bank does not receive an unconditional acceptance
+                  within the stipulated time, it will be construed that you are
+                  not interested in accepting this offer and the above said
+                  appointment offered to you shall automatically stand withdrawn
+                  and cancelled unless you are expressly permitted to join the
+                  Bank's service.<br />No correspondence in this regard for any
+                  change in placement and/or modifications in terms and
+                  conditions of appointment shall be entertained by the Bank..
+                </p>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <table class="bordered-table full-width" style="margin-top: -1px">
+        <tr>
+          <td
+            colspan="2"
+            class="bold"
+            style="text-align: center; padding: 25px 10px 15px 10px"
+          >
+            <p>भवदीय / Yours faithfully,</p>
+            <br /><br /><br /><br />
+            <p>
+              <span th:text="${officerName != null ? officerName : '-'}"
+                >B PRIYA KUMAR</span
+              >
+              /
+              <span
+                th:text="${officerNameInHindi != null ? officerNameInHindi : '-'}"
+                >बी प्रिया कुमार</span
+              >
+            </p>
+            <p>
+              <span th:text="${officerRole != null ? officerRole : '-'}"
+                >Deputy General Manager (HRM)</span
+              >
+              /
+              <span
+                th:text="${officerRoleInHindi != null ? officerRoleInHindi : '-'}"
+                >उप महाप्रबंधक (मानव संसाधन प्रबंधन)</span
+              >
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td colspan="2" class="declaration-cell" style="padding: 10px">
+            <p class="bold mb-10" style="font-style: italic">
+              मैं एतदद्वारा उपर्युक्त निर्धारित नियमों एवं शर्तों के अनुसार, बैक
+              में
+              <span
+                th:text="${hindiJobGradeCode != null ? hindiJobGradeCode : '-'}"
+              >
+                वे.-I
+              </span>
+              में
+              <span
+                th:text="${hindiPositionName != null ? hindiPositionName : '-'}"
+                >प्रोबेशनरी ऑफिसर</span
+              >
+              के रूप में अपनी नियुक्ति के प्रस्ताव को स्वीकार करता हूँ / करती
+              हूँ।
+            </p>
+            <p class="bold" style="font-style: italic">
+              I hereby accept the offer of appointment as
+              <span th:text="${positionName != null ? positionName : '-'}"
+                >Probationary Officer</span
+              >
+              in
+              <span th:text="${jobGradeCode != null ? jobGradeCode : '-'}"
+                >JMG/S-I</span
+              >
+              in Bank's service, as per the terms and conditions stipulated
+              above.
+            </p>
+          </td>
+        </tr>
+        <tr>
+          <td
+            class="details-col"
+            style="
+              width: 50%;
+              padding: 15px;
+              line-height: 2.5;
+              vertical-align: top;
+            "
+          >
+            <div>नाम/ Name: _________________________________________</div>
+            <div>स्थान /Place: ________________________________________</div>
+            <div>दिनांक /Date: ________________________________________</div>
+          </td>
+          <td
+            class="signature-container"
+            style="
+              width: 50%;
+              padding: 15px;
+              vertical-align: bottom;
+              position: relative;
+              height: 130px;
+            "
+          >
+            <div
+              class="signature-text"
+              style="
+                position: absolute;
+                top: 50px;
+                left: 0;
+                right: 0;
+                text-align: center;
+                font-weight: bold;
+              "
+            >
+              (हस्ताक्षर)/(Signature)
+            </div>
+            <div
+              class="signature-name"
+              style="text-align: left; font-weight: bold; margin-top: 100px"
+            >
+              Name: ______________________________________________
+            </div>
+          </td>
+        </tr>
+      </table>
+
+      <div style="text-align: right; margin-top: 5px">
+        <p>Page <b>6</b> of <b>6</b></p>
+      </div>
+
+      <div class="footer-wrapper">
+        <table class="footer-table" border="0" cellpadding="0" cellspacing="0">
+          <tr>
+            <td style="width: 15%"></td>
+            <td style="width: 70%" class="footer-center">
+              <p>
+                प्रधान कार्यालय, मानव संसाधन विभाग, सागरसॉफ्ट भवन बड़ौदा – 390007-
+                भारत
+              </p>
+              <p>
+                Head Office, HRM Department, Sagarsoft Bhavan, Alkapuri,
+                Baroda-390007 - India
+              </p>
+            </td>
+            <td style="width: 15%"></td>
+          </tr>
+        </table>
+      </div>
+    </div>
+  </body>
+</html>

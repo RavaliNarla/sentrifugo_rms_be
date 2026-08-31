@@ -1,0 +1,216 @@
+{
+  "type": "object",
+  "properties": {
+    "personal": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Full name of the candidate"
+        },
+        "firstName": {
+          "type": "string",
+          "description": "First name of the candidate"
+        },
+        "middleName": {
+          "type": "string",
+          "description": "Middle name of the candidate"
+        },
+        "lastName": {
+          "type": "string",
+          "description": "Last name or surname of the candidate"
+        },
+        "fullNameAsPerAadhar": {
+          "type": "string",
+          "description": "Full name as mentioned in Aadhar card"
+        },
+        "fullNameAsPerTenth": {
+          "type": "string",
+          "description": "Full name as per 10th standard certificate or marksheet"
+        },
+        "fullNameAsPerBirthCertificate": {
+          "type": "string",
+          "description": "Full name as per birth certificate"
+        },
+        "fatherName": {
+          "type": "string",
+          "description": "Father's full name"
+        },
+        "motherName": {
+          "type": "string",
+          "description": "Mother's full name"
+        },
+        "spouseName": {
+          "type": "string",
+          "description": "Spouse's full name if married"
+        },
+        "dob": {
+          "type": "string",
+          "description": "Date of birth of the candidate Format: DD-MM-YYYY",
+          "pattern": "^[0-9]{2}/[0-9]{2}/[0-9]{4}$"
+        },
+        "gender": {
+          "type": "string",
+          "description": "Gender of the candidate"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "pattern": "^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$",
+          "description": "Email address"
+        },
+        "phone": {
+          "type": "string",
+          "pattern": "^\\+?[0-9\\-\\s\\(\\)]+$",
+          "description": "International format mobile number"
+        },
+        "mobile": {
+          "type": "string",
+          "pattern": "^\\+?[1-9][\\d\\s]{9,15}$",
+          "description": "Mobile number with optional country code and spaces (up to 15 digits)"
+        },
+        "alternatePhoneNumber": {
+          "type": "string",
+          "description": "Alternate or secondary phone number"
+        },
+        "address": {
+          "type": "string",
+          "description": "Full postal address"
+        },
+        "country": { "type": "string" },
+        "nationality": {
+          "type": "string",
+          "description": "Nationality or citizenship of the candidate. Can also be country name labelled country etc in resume"
+        },
+        "religion": { "type": "string" },
+        "category": {
+          "type": "string",
+          "description": "Reservation category like General, OBC, SC, ST, EWS etc"
+        },
+        "caste": {
+          "type": "string",
+          "description": "Caste or community of the candidate"
+        },
+        "bloodType": { "type": "string" },
+        "maritalStatus": { "type": "string" },
+        "domicileState": { "type": "string" },
+        "countryOfBirth": { "type": "string" },
+        "stateOfBirth": { "type": "string" },
+        "townOfBirth": { "type": "string" },
+        "communitySegment": { "type": "string" },
+        "motherTongue": { "type": "string" },
+        "language1": {
+          "type": "string",
+          "description": "First language known by candidate. If only one language is present in resume, or mentioned as native, it should be filled here."
+        },
+        "language2": {
+          "type": "string",
+          "description": "Second language known by candidate"
+        },
+        "language3": {
+          "type": "string",
+          "description": "Third language known by candidate"
+        },
+        "differentlyAbled": { "type": "string" },
+        "cibilScore": {
+          "type": "number",
+          "description": "CIBIL credit score if mentioned (not other credit scores)"
+        },
+
+        "creditScore": {
+          "type": "number",
+          "description": "any other credit score other than CIBIL score if mentioned"
+        },
+
+        "socialMediaProfiles": {
+          "type": "array",
+          "description": "Social media profile links in order of mention",
+          "items": {
+            "type": "string"
+          }
+        },
+        "githubLink": {
+          "type": "string",
+          "description": "GitHub profile URL"
+        },
+        "skills": { "type": "string" },
+        "currentEmployer": { "type": "string" },
+        "currentDesignation": { "type": "string" },
+        "totalExperience": { "type": "string" }
+      }
+    },
+
+    "experience": {
+      "type": "array",
+      "description": "List of work experiences",
+      "items": {
+        "type": "object",
+        "properties": {
+          "employer": {
+            "type": "string"
+          },
+          "designation": {
+            "type": "string"
+          },
+          "startDate": {
+            "type": "string",
+            "pattern": "^[0-9]{2}-[0-9]{2}-[0-9]{4}$",
+            "description": "Format: DD-MM-YYYY"
+          },
+          "endDate": {
+            "type": "string",
+            "pattern": "^[0-9]{2}-[0-9]{2}-[0-9]{4}$",
+            "description": "Format: DD-MM-YYYY"
+          },
+          "location": { "type": "string" },
+          "totalYears": { "type": "string" }
+        }
+      }
+    },
+
+    "education": {
+      "type": "array",
+      "description": "List of educational qualifications",
+      "items": {
+        "type": "object",
+        "properties": {
+          "level": { "type": "string" },
+          "board": { "type": "string" },
+          "school": { "type": "string" },
+          "passingYear": {
+            "type": "string",
+            "pattern": "^[0-9]{4}$"
+          },
+          "percentage": { "type": "string" },
+          "state": { "type": "string" }
+        }
+      }
+    },
+
+    "certifications": {
+      "type": "array",
+      "description": "List of certifications and professional credentials",
+      "items": {
+        "type": "object",
+        "properties": {
+          "certificateName": {
+            "type": "string",
+            "description": "Name or title of the certification"
+          },
+          "issuedBy": {
+            "type": "string",
+            "description": "Organization or institution that issued the certification"
+          },
+          "certificationDate": {
+            "type": "string",
+            "description": "Date when certification was obtained"
+          },
+          "certificationExpiryDate": {
+            "type": "string",
+            "description": "Expiry date of certification if applicable"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Approval Request</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Poppins', Arial, sans-serif;">
+
+<table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 800px; background-color: #ffffff; border: 3px solid #3498db; border-collapse: collapse; margin: 0 auto;">
+
+    <tr>
+        <td style="background-color: #3498db; padding: 15px 30px;">
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                    <td align="left" valign="middle" style="color: #ffffff; font-size: 18px; font-weight: 600; font-family: 'Poppins', Arial, sans-serif;">
+                        Approval Request
+                    </td>
+                    <td align="right" valign="middle">
+                        <img src="cid:logo" alt="Sagarsoft Logo" style="height: 45px; vertical-align: middle; border: 0;">
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <tr>
+        <td style="padding: 25px 30px; background-color: #ffffff;">
+
+            <p style="font-size: 18px; color: #000000; margin: 0 0 10px 0;">
+                Dear <strong th:text="${recruiterName}">User Name</strong>,
+            </p>
+
+            <!-- Dynamic Header: Only the flag set to 'true' will render -->
+            <p style="font-size: 18px; color: #000000; margin: 0 0 25px 0; line-height: 1.5;">
+                You have got a <strong th:text="${approvalRequestType}"></strong> approval request/s.
+            </p>
+
+            <p style="font-size: 16px; color: #000000; margin: 0 0 20px 0; line-height: 1.5;">
+                Please find the Requisition and  Position details below:
+            </p>
+
+            <!-- Nested List Structure for Map<String, List<String>> -->
+            <ul style="margin: 0 0 25px 0; padding-left: 20px; font-size: 16px; color: #000000; line-height: 1.6;">
+                <li th:each="entry : ${requisitionPositionMap}" style="margin-bottom: 15px;">
+                    <span style="color: #3498db; font-weight: 600;">Requisition: </span>
+                    <strong th:text="${entry.key}">Requisition Name</strong>
+
+                    <!-- Nested UL for multiple positions -->
+                    <ul style="margin-top: 5px; padding-left: 20px;">
+                        <li th:each="position : ${entry.value}">
+                            Position: <span th:text="${position}">Position Name</span>
+                        </li>
+                    </ul>
+                </li>
+            </ul>
+
+            <p style="font-size: 16px; color: #000000; margin: 0 0 25px 0; line-height: 1.5;">
+                Please review the request in the system and take the necessary action.
+            </p>
+
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                    <td align="left" valign="bottom" style="font-size: 16px; color: #000000; line-height: 1.6;">
+                        <strong style="font-weight: 600;">Regards,</strong><br/>
+                        <span th:text="${companyName}">Sagarsoft</span>
+                    </td>
+                    <td align="right" valign="bottom" style="font-size: 14px; color: #3498db;">
+                        This is a system-generated email. Please do not reply.
+                    </td>
+                </tr>
+            </table>
+
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

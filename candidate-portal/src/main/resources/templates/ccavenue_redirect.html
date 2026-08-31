@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Redirecting to CCAvenue...</title>
+    <script type="text/javascript">
+        window.onload = function() {
+            document.forms['ccavenueForm'].submit();
+        };
+    </script>
+</head>
+<body>
+    <form id="ccavenueForm" th:action="${ccavenueUrl}" method="post">
+        <div th:each="paramEntry : ${ccavenueParams}">
+            <input type="hidden" th:name="${paramEntry.key}" th:value="${paramEntry.value}" />
+        </div>
+        <noscript>
+            <p>Please click the button below to proceed to CCAvenue.</p>
+            <input type="submit" value="Continue to CCAvenue" />
+        </noscript>
+    </form>
+</body>
+</html>

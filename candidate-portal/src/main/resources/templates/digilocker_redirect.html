@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <title>Redirecting to DigiLocker...</title>
+    <script type="text/javascript">
+        window.onload = function() {
+            window.location.href = /*[[${digilockerUrl}]]*/ '';
+        };
+    </script>
+</head>
+<body>
+    <div style="text-align: center; margin-top: 50px; font-family: Arial, sans-serif;">
+        <p>Redirecting to DigiLocker for authorization...</p>
+        <p>Please wait while we redirect you.</p>
+        <noscript>
+            <p>JavaScript is disabled. Please click the button below to proceed to DigiLocker.</p>
+            <a th:href="${digilockerUrl}" style="display: inline-block; padding: 10px 20px; background-color: #007bff; color: white; text-decoration: none; border-radius: 5px;">Continue to DigiLocker</a>
+        </noscript>
+    </div>
+</body>
+</html>

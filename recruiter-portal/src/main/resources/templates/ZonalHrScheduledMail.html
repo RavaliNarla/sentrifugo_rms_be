@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <title>Interview Scheduled Notification</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins&display=swap" rel="stylesheet">
+    <style>
+        .meeting-link:hover {
+            text-decoration: underline !important;
+            color: #2b3a6b !important;
+        }
+    </style>
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Poppins', Arial, sans-serif;">
+
+<table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 800px; background-color: #ffffff; border: 3px solid #3498db; border-collapse: collapse; margin: 0 auto;">
+
+    <tr>
+        <td style="background-color: #3498db; padding: 15px 30px;">
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                    <td align="left" valign="middle" style="color: #ffffff; font-size: 18px; font-weight: 600; font-family: 'Poppins', Arial, sans-serif;">
+                        Interview Scheduled Notification
+                    </td>
+                    <td align="right" valign="middle" >
+                        <img src="cid:logo" alt="Company Logo" style="height: 45px; vertical-align: middle; border: 0;">
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+
+    <tr>
+        <td style="padding: 25px 30px; background-color: #ffffff;">
+
+            <p style="font-size: 18px; color: #000000; margin: 0 0 10px 0;">
+                Dear <strong th:text="${zonalHrName}">Zonal HR</strong>,
+            </p>
+
+            <p style="font-size: 18px; color: #000000; margin: 0 0 25px 0; line-height: 1.5;">
+                This is to inform you that an interview has been successfully scheduled.
+            </p>
+
+            <p style="font-size: 16px; color: #000000; margin: 0 0 25px 0; line-height: 1.5;">
+                Please find the interview details below:
+            </p>
+
+            <table border="0" cellpadding="0" cellspacing="0" width="100%" style="margin: 0 0 25px 0;">
+                <tr>
+                    <td width="50%" valign="top" style="padding-bottom: 25px;">
+                        <span style="font-size: 16px; color: #3498db;">Candidate Name: </span>
+                        <span style="font-size: 16px; color: #000000;" th:text="${candidateName}">Candidate Name</span>
+                    </td>
+                    <td width="50%" valign="top" style="padding-bottom: 25px;">
+                        <span style="font-size: 16px; color: #3498db;">Application Number: </span>
+                        <span style="font-size: 16px; color: #000000;" th:text="${applicationNo}">APP - 12345</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td width="50%" valign="top" style="padding-bottom: 25px;">
+                        <span style="font-size: 16px; color: #3498db;">Interview Centre: </span>
+                        <span style="font-size: 16px; color: #000000;" th:text="${centreAddress}">Centre Address</span>
+                    </td>
+                    <td width="50%" valign="top" style="padding-bottom: 25px;">
+                        <span style="font-size: 16px; color: #3498db;">Panel Name: </span>
+                        <span style="font-size: 16px; color: #000000;" th:text="${panelName}">Panel Name</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td width="50%" valign="top" style="padding-bottom: 25px;">
+                        <span style="font-size: 16px; color: #3498db;">Interview Start: </span>
+                        <span style="font-size: 16px; color: #000000;" th:text="${#temporals.format(startDateTime, 'dd-MM-yyyy hh:mm a')}">10-Feb-2026 10:00 AM</span>
+                    </td>
+                    <td width="50%" valign="top" style="padding-bottom: 25px;">
+                        <span style="font-size: 16px; color: #3498db;">Interview End: </span>
+                        <span style="font-size: 16px; color: #000000;" th:text="${#temporals.format(endDateTime, 'dd-MM-yyyy hh:mm a')}">10-Feb-2026 11:00 AM</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td colspan="2" valign="top" style="padding-bottom: 25px;">
+                        <span style="font-size: 16px; color: #3498db;">Interviewers: </span>
+                        <span style="font-size: 16px; color: #000000;" th:text="${interviewers}">Interviewer 1, Interviewer 2</span>
+                    </td>
+                </tr>
+<!--                <tr>-->
+<!--                    <td colspan="2" valign="top" style="padding-bottom: 15px;">-->
+<!--                        <span style="font-size: 16px; color: #3498db;">Meeting Link: </span><br/>-->
+<!--                        <a th:href="${meetingLink}" class="meeting-link" style="font-size: 16px; color: #42579F; text-decoration: none; word-break: break-all;" th:text="${meetingLink}">-->
+<!--                            https://meeting-link.com/xyz-->
+<!--                        </a>-->
+<!--                    </td>-->
+<!--                </tr>-->
+            </table>
+
+            <p style="font-size: 16px; color: #000000; margin: 0 0 25px 0; line-height: 1.5;">
+                Kindly ensure necessary arrangements are made accordingly at the interview centre.
+            </p>
+
+            <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                    <td align="left" valign="bottom" style="font-size: 16px; color: #000000; line-height: 1.6;">
+                        <strong style="font-weight: 600;">Regards,</strong><br/>
+                        <span th:text="${companyName}">Company Name</span>
+                    </td>
+                    <td align="right" valign="bottom" style="font-size: 14px; color: #3498db;">
+                        This is system-generated email. Please do not reply.
+                    </td>
+                </tr>
+            </table>
+
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>
