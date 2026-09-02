@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8"/>
+    <style>
+        body { font-family: Georgia, 'Times New Roman', serif; color: #222; padding: 40px; }
+        .letterhead { border-bottom: 2px solid #162b75; padding-bottom: 12px; margin-bottom: 26px; }
+        .letterhead h1 { color: #208bbd; font-size: 20px; margin: 0; letter-spacing: 0.5px; }
+        .date-line { text-align: right; font-size: 13px; color: #555; margin-bottom: 18px; }
+        .content p { line-height: 1.7; font-size: 14px; text-align: justify; }
+        .highlight { background: #e7ebec; padding: 14px 18px; border-left: 4px solid #208bbd; margin: 18px 0; font-size: 13px; }
+        .highlight b { color: #162b75; }
+        .signature { margin-top: 40px; font-size: 13px; }
+    </style>
+</head>
+<body>
+<div class="letterhead">
+    <h1 th:text="${companyName}">Company Name</h1>
+</div>
+<div class="date-line">Letter of Offer</div>
+<div class="content">
+    <p>Dear <b th:text="${candidateName}">Candidate Name</b>,</p>
+    <p>Congratulations! Following your successful interview, we are delighted to extend this offer of
+        employment for the position of <b th:text="${positionTitle}">Position</b> in the
+        <b th:text="${department}">Department</b> department, based at <b th:text="${location}">Location</b>.</p>
+
+    <div class="highlight">
+        <p><b>Annual Compensation:</b> &#8377; <span th:text="${salary}">0</span></p>
+        <p><b>Offer valid until:</b> <span th:text="${acceptBeforeDate}">date</span></p>
+        <p><b>Contact:</b> <span th:text="${candidateEmail}">email</span> | <span th:text="${candidatePhone}">phone</span></p>
+    </div>
+
+    <p>Kindly confirm your acceptance of this offer at your earliest convenience, and no later than the date
+        indicated above. Should you have any questions, please do not hesitate to reach out to our HR team.</p>
+    <p>We look forward to having you join us and contribute to our continued success.</p>
+</div>
+<div class="signature">
+    <p>Warm regards,<br/>Human Resources Team<br/><span th:text="${companyName}">Company Name</span></p>
+</div>
+</body>
+</html>

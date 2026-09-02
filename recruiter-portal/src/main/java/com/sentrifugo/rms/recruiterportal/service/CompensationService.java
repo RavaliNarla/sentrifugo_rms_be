@@ -1,0 +1,82 @@
+package com.sentrifugo.rms.recruiterportal.service;
+
+import com.sentrifugo.rms.common.exception.CommonException;
+import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
+import com.sentrifugo.rms.db.entity.CandidateEntity;
+import com.sentrifugo.rms.db.enums.CandidateStatus;
+import com.sentrifugo.rms.db.repository.CandidateRepository;
+import com.sentrifugo.rms.recruiterportal.dto.CandidateDTO;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+@RequiredArgsConstructor
+public class CompensationService {
+
+    private final CandidateRepository candidateRepository;
+
+    @Transactional
+    public void moveToCompensation(List<UUID> candidateIds) {
+        List<CandidateEntity> candidates = candidateRepository.findByIdIn(candidateIds);
+        for (CandidateEntity candidate : candidates) {
+            if (candidate.getStatus() != CandidateStatus.QUALIFIED) {
+                throw new CommonException("Candidate '" + candidate.getName() + "' must be QUALIFIED to move to Compensation Pool.");
+            }
+            candidate.setStatus(CandidateStatus.COMPENSATION_PENDING);
+        }
+        candidateRepository.saveAll(candidates);
+    }
+
+    @Transactional
+    public void updateSalary(UUID candidateId, BigDecimal salary) {
+        CandidateEntity candidate = candidateRepository.findById(candidateId)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
+        if (candidate.getStatus() != CandidateStatus.COMPENSATION_PENDING) {
+            throw new CommonException("Candidate is not in the Compensation Pool.");
+        }
+        candidate.setSalary(salary);
+        candidateRepository.save(candidate);
+    }
+
+    @Transactional
+    public void moveToOffer(List<UUID> candidateIds) {
+        List<CandidateEntity> candidates = candidateRepository.findByIdIn(candidateIds);
+        for (CandidateEntity candidate : candidates) {
+            if (candidate.getStatus() != CandidateStatus.COMPENSATION_PENDING) {
+                throw new CommonException("Candidate '" + candidate.getName() + "' is not in the Compensation Pool.");
+            }
+            if (candidate.getSalary() == null) {
+                throw new CommonException("Candidate '" + candidate.getName() + "' has no salary entered.");
+            }
+            candidate.setStatus(CandidateStatus.MOVED_TO_OFFER);
+        }
+        candidateRepository.saveAll(candidates);
+    }
+
+    public Page<CandidateDTO> getCompensationPool(UUID positionId, String searchText, int page, int size) {
+        Page<CandidateEntity> result = candidateRepository.search(positionId,
+                List.of(CandidateStatus.COMPENSATION_PENDING), searchText, PageRequest.of(page, size));
+        return result.map(this::toDto);
+    }
+
+    private CandidateDTO toDto(CandidateEntity entity) {
+        return CandidateDTO.builder()
+                .id(entity.getId())
+                .requisitionId(entity.getRequisitionId())
+                .positionId(entity.getPositionId())
+                .name(entity.getName())
+                .phone(entity.getPhone())
+                .email(entity.getEmail())
+                .status(entity.getStatus().name())
+                .finalScore(entity.getFinalScore())
+                .salary(entity.getSalary())
+                .build();
+    }
+}
