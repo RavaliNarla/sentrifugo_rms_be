@@ -84,12 +84,25 @@ public class InterviewSchedulingService {
     private List<Slot> generateSlots(List<PanelWindowDTO> windows) {
         List<Slot> slots = new ArrayList<>();
         for (PanelWindowDTO window : windows) {
-            LocalTime current = window.getStartTime();
+            if (window.getDurationMinutes() == null || window.getDurationMinutes() <= 0) {
+                throw new CommonException("Interview duration must be greater than 0 minutes.");
+            }
+            if (window.getStartTime() == null || window.getEndTime() == null) {
+                throw new CommonException("Start time and end time are required for each panel window.");
+            }
+            if (!window.getStartTime().isBefore(window.getEndTime())) {
+                throw new CommonException("Start time must be before end time for each panel window.");
+            }
+
+            // Use minute arithmetic (not LocalTime.plusMinutes in a while) so midnight wrap
+            // or duration=0 can never create an infinite slot loop / OOM.
             int duration = window.getDurationMinutes();
-            while (!current.plusMinutes(duration).isAfter(window.getEndTime())) {
-                LocalTime end = current.plusMinutes(duration);
-                slots.add(new Slot(window.getPanelId(), window.getInterviewDate(), current, end, duration));
-                current = end;
+            int startMins = window.getStartTime().toSecondOfDay() / 60;
+            int endMins = window.getEndTime().toSecondOfDay() / 60;
+            for (int cursor = startMins; cursor + duration <= endMins; cursor += duration) {
+                LocalTime start = LocalTime.of(cursor / 60, cursor % 60);
+                LocalTime end = LocalTime.of((cursor + duration) / 60, (cursor + duration) % 60);
+                slots.add(new Slot(window.getPanelId(), window.getInterviewDate(), start, end, duration));
             }
         }
         return slots;

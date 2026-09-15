@@ -82,6 +82,10 @@
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
                     <version>${spring-boot.version}</version>
+                    <configuration>
+                        <!-- Cap heap so a bug can't hang the whole machine; 768m is enough for this preview app -->
+                        <jvmArguments>-Xms128m -Xmx768m -XX:+HeapDumpOnOutOfMemoryError</jvmArguments>
+                    </configuration>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
