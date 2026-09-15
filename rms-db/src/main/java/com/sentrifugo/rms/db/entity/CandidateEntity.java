@@ -50,6 +50,9 @@ public class CandidateEntity extends BaseEntity<UUID> {
     @Column(name = "id_proof_url")
     private String idProofUrl;
 
+    @Column(name = "photo_url")
+    private String photoUrl;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)
     @Builder.Default

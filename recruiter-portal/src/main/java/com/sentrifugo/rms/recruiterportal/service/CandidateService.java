@@ -31,9 +31,10 @@ public class CandidateService {
 
     private static final String RESUME_FOLDER = "resumes";
     private static final String ID_PROOF_FOLDER = "id-proofs";
+    private static final String PHOTO_FOLDER = "photos";
 
     @Transactional
-    public CandidateDTO add(CandidateDTO dto, MultipartFile resume, MultipartFile idProof) {
+    public CandidateDTO add(CandidateDTO dto, MultipartFile resume, MultipartFile idProof, MultipartFile photo) {
         JobPositionEntity position = jobPositionRepository.findById(dto.getPositionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Position not found"));
 
@@ -51,6 +52,9 @@ public class CandidateService {
         }
         if (idProof != null && !idProof.isEmpty()) {
             entity.setIdProofUrl(fileStorageService.store(idProof, ID_PROOF_FOLDER));
+        }
+        if (photo != null && !photo.isEmpty()) {
+            entity.setPhotoUrl(fileStorageService.store(photo, PHOTO_FOLDER));
         }
 
         return toDto(candidateRepository.save(entity));
@@ -105,6 +109,8 @@ public class CandidateService {
                 .hasResume(entity.getResumeUrl() != null)
                 .idProofUrl(entity.getIdProofUrl())
                 .hasIdProof(entity.getIdProofUrl() != null)
+                .photoUrl(entity.getPhotoUrl())
+                .hasPhoto(entity.getPhotoUrl() != null)
                 .status(entity.getStatus().name())
                 .finalScore(entity.getFinalScore())
                 .salary(entity.getSalary())

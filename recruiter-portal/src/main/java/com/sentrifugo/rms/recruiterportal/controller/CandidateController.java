@@ -26,14 +26,15 @@ public class CandidateController {
     private final CandidateService candidateService;
     private final ObjectMapper objectMapper;
 
-    @Operation(summary = "Add a candidate manually to a position's Candidate Pool (multipart: 'candidate' JSON + optional 'resume' + optional 'idProof')")
+    @Operation(summary = "Add a candidate manually to a position's Candidate Pool (multipart: 'candidate' JSON + optional 'resume' + optional 'idProof' + optional 'photo')")
     @PostMapping(value = "/add", consumes = "multipart/form-data")
     public ResponseEntity<ApiResponse<CandidateDTO>> add(
             @RequestPart("candidate") String candidateJson,
             @RequestPart(value = "resume", required = false) MultipartFile resume,
-            @RequestPart(value = "idProof", required = false) MultipartFile idProof) throws Exception {
+            @RequestPart(value = "idProof", required = false) MultipartFile idProof,
+            @RequestPart(value = "photo", required = false) MultipartFile photo) throws Exception {
         CandidateDTO dto = objectMapper.readValue(candidateJson, CandidateDTO.class);
-        return ResponseEntity.ok(ApiResponse.ok(candidateService.add(dto, resume, idProof), "Candidate added successfully"));
+        return ResponseEntity.ok(ApiResponse.ok(candidateService.add(dto, resume, idProof, photo), "Candidate added successfully"));
     }
 
     @Operation(summary = "Search/list candidates for a position (server-side paginated)")

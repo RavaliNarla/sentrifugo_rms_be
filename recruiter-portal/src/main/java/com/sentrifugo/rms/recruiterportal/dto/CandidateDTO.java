@@ -41,6 +41,9 @@ public class CandidateDTO {
     private String idProofUrl;
     private boolean hasIdProof;
 
+    private String photoUrl;
+    private boolean hasPhoto;
+
     private String status;
     private BigDecimal finalScore;
     private BigDecimal salary;
