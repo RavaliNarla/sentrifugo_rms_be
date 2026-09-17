@@ -70,4 +70,22 @@ public class FileStorageService {
             throw new ResourceNotFoundException("File not found: " + relativePath);
         }
     }
+
+    /** Best-effort delete; ignores missing files and logs I/O failures. */
+    public void deleteQuietly(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            return;
+        }
+        try {
+            Path base = Paths.get(basePath).toAbsolutePath().normalize();
+            Path file = base.resolve(relativePath).normalize();
+            if (!file.startsWith(base)) {
+                log.warn("Refusing to delete path outside storage root: {}", relativePath);
+                return;
+            }
+            Files.deleteIfExists(file);
+        } catch (IOException e) {
+            log.warn("Failed to delete file {}: {}", relativePath, e.getMessage());
+        }
+    }
 }

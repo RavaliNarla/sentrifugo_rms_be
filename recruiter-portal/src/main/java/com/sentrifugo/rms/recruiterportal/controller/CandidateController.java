@@ -57,6 +57,16 @@ public class CandidateController {
         return ResponseEntity.ok(ApiResponse.ok("Candidate deleted successfully"));
     }
 
+    @Operation(summary = "Delete one candidate document: photo | resume | id-proof (only while status = ADDED)")
+    @DeleteMapping("/{id}/documents/{documentType}")
+    public ResponseEntity<ApiResponse<CandidateDTO>> deleteDocument(
+            @PathVariable UUID id,
+            @PathVariable String documentType) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                candidateService.deleteDocument(id, documentType),
+                "Document deleted successfully"));
+    }
+
     @Operation(summary = "Search/list candidates for a position (server-side paginated)")
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Page<CandidateDTO>>> search(

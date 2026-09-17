@@ -103,6 +103,37 @@ public class CandidateService {
         candidateRepository.delete(entity);
     }
 
+    /**
+     * Clears a single uploaded document (photo / resume / id-proof) while the candidate
+     * is still editable (status = ADDED). Returns the updated candidate DTO.
+     */
+    @Transactional
+    public CandidateDTO deleteDocument(UUID id, String documentType) {
+        CandidateEntity entity = candidateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
+        if (entity.getStatus() != CandidateStatus.ADDED) {
+            throw new CommonException("Only newly-added candidates can have documents removed.");
+        }
+
+        String type = documentType == null ? "" : documentType.trim().toLowerCase().replace('_', '-');
+        switch (type) {
+            case "photo" -> {
+                fileStorageService.deleteQuietly(entity.getPhotoUrl());
+                entity.setPhotoUrl(null);
+            }
+            case "resume" -> {
+                fileStorageService.deleteQuietly(entity.getResumeUrl());
+                entity.setResumeUrl(null);
+            }
+            case "id-proof", "idproof" -> {
+                fileStorageService.deleteQuietly(entity.getIdProofUrl());
+                entity.setIdProofUrl(null);
+            }
+            default -> throw new CommonException("Unknown document type. Use photo, resume, or id-proof.");
+        }
+        return toDto(candidateRepository.save(entity));
+    }
+
     private void validateContactFields(CandidateDTO dto) {
         if (dto.getEmail() == null || !EMAIL_PATTERN.matcher(dto.getEmail()).matches()) {
             throw new CommonException("Please enter a valid email address.");
