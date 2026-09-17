@@ -29,6 +29,7 @@ public class MasterDataSeeder implements CommandLineRunner {
     private final SpecializationRepository specializationRepository;
     private final EducationQualificationRepository educationQualificationRepository;
     private final PositionTitleRepository positionTitleRepository;
+    private final CertificationRepository certificationRepository;
 
     private static final List<String> DEPARTMENTS = List.of(
             "MARKETING", "PROCESS & QC", "MECHANICAL", "HR & ADMIN", "MINES & AUTOMOBILE",
@@ -67,6 +68,21 @@ public class MasterDataSeeder implements CommandLineRunner {
      * titles and to backfill department_id on older orphan rows so Add Position's
      * department-filtered dropdown is never empty for these depts.
      */
+    private static final List<String> CERTIFICATIONS = List.of(
+            "NCCBM Certified Quality Controller",
+            "Cement Manufacturing Technology (NCB)",
+            "ISO 9001:2015 Lead Auditor",
+            "ISO 14001 Environmental Management Auditor",
+            "Concrete Technology Certification",
+            "Kiln Operations & Pyroprocessing Certification",
+            "NEBOSH Occupational Health & Safety",
+            "Six Sigma Green Belt",
+            "Green Building / LEED AP",
+            "First Aid & Fire Safety Certification",
+            "Crane & Heavy Equipment Operator License",
+            "SAP Plant Maintenance (PM) Certification"
+    );
+
     private static final String[][] POSITION_TITLES = {
             {"Accounts Executive", "ACCOUNTS & FINANCE"},
             {"Administrative Officer", "HR & ADMIN"},
@@ -85,6 +101,7 @@ public class MasterDataSeeder implements CommandLineRunner {
         seedLocations();
         seedApprovedByRoles();
         seedSpecializations();
+        seedCertifications();
         seedPositionTitles();
     }
 
@@ -140,6 +157,14 @@ public class MasterDataSeeder implements CommandLineRunner {
                         .orElse(null);
             }
             specializationRepository.save(SpecializationEntity.builder().name(name).educationQualificationId(eduId).build());
+        }
+    }
+
+    private void seedCertifications() {
+        for (String name : CERTIFICATIONS) {
+            if (!certificationRepository.existsByNameIgnoreCase(name)) {
+                certificationRepository.save(CertificationEntity.builder().name(name).build());
+            }
         }
     }
 

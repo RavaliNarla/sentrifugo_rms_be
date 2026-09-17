@@ -57,8 +57,8 @@ public class JobPositionEntity extends BaseEntity<UUID> {
     @Column(name = "experience_years")
     private Integer experienceYears;
 
-    @Column(name = "certifications")
-    private String certifications;
+    @Column(name = "certification_id")
+    private UUID certificationId;
 
     @Column(name = "medical_fitness_required")
     @Builder.Default

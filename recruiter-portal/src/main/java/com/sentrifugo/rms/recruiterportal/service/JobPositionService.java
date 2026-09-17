@@ -31,6 +31,7 @@ public class JobPositionService {
     private final PositionTitleRepository positionTitleRepository;
     private final EducationQualificationRepository educationQualificationRepository;
     private final SpecializationRepository specializationRepository;
+    private final CertificationRepository certificationRepository;
     private final ApprovedByRoleRepository approvedByRoleRepository;
     private final FileStorageService fileStorageService;
 
@@ -102,7 +103,7 @@ public class JobPositionService {
         entity.setEducationQualificationId(dto.getEducationQualificationId());
         entity.setSpecializationId(dto.getSpecializationId());
         entity.setExperienceYears(dto.getExperienceYears());
-        entity.setCertifications(dto.getCertifications());
+        entity.setCertificationId(dto.getCertificationId());
         entity.setMedicalFitnessRequired(Boolean.TRUE.equals(dto.getMedicalFitnessRequired()));
         entity.setEmploymentType(dto.getEmploymentType() != null ? EmploymentType.valueOf(dto.getEmploymentType()) : EmploymentType.REGULAR);
         // Contractual Period only makes sense for CONTRACT employment - clear it otherwise so no stale value lingers.
@@ -183,6 +184,8 @@ public class JobPositionService {
                 .collect(Collectors.toMap(EducationQualificationEntity::getId, EducationQualificationEntity::getName));
         Map<UUID, String> specializations = specializationRepository.findAll().stream()
                 .collect(Collectors.toMap(SpecializationEntity::getId, SpecializationEntity::getName));
+        Map<UUID, String> certifications = certificationRepository.findAll().stream()
+                .collect(Collectors.toMap(CertificationEntity::getId, CertificationEntity::getName));
         Map<UUID, String> approvedByRoles = approvedByRoleRepository.findAll().stream()
                 .collect(Collectors.toMap(ApprovedByRoleEntity::getId, ApprovedByRoleEntity::getName));
 
@@ -202,7 +205,8 @@ public class JobPositionService {
                 .specializationId(entity.getSpecializationId())
                 .specializationName(specializations.get(entity.getSpecializationId()))
                 .experienceYears(entity.getExperienceYears())
-                .certifications(entity.getCertifications())
+                .certificationId(entity.getCertificationId())
+                .certificationName(certifications.get(entity.getCertificationId()))
                 .medicalFitnessRequired(entity.getMedicalFitnessRequired())
                 .contractualPeriod(entity.getContractualPeriod())
                 .employmentType(entity.getEmploymentType() != null ? entity.getEmploymentType().name() : null)

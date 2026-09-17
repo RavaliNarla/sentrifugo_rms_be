@@ -43,8 +43,9 @@ public class JobPositionDTO {
 
     private Integer experienceYears;
 
-    /** Optional, non-mandatory per the requirements doc - free text, useful for roles requiring certifications. */
-    private String certifications;
+    /** Optional, non-mandatory per the requirements doc - single-select from the Certification master. */
+    private UUID certificationId;
+    private String certificationName;
 
     private Boolean medicalFitnessRequired;
 
