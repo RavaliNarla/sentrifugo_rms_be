@@ -63,7 +63,8 @@ public class OfferService {
     @Value("${app.company.name:Sentrifugo}")
     private String companyName;
 
-    private static final List<OfferStatus> REGENERATABLE = List.of(OfferStatus.GENERATED, OfferStatus.L1_REJECTED, OfferStatus.L2_REJECTED);
+    /** SCL_41: only accepted/rejected offers are locked; everything else can be regenerated and resent. */
+    private static final List<OfferStatus> TERMINAL = List.of(OfferStatus.ACCEPTED, OfferStatus.REJECTED);
 
     @Transactional
     public List<CandidateOfferDTO> generateOffers(GenerateOfferRequest request) {
@@ -86,9 +87,13 @@ public class OfferService {
             }
 
             Optional<CandidateOfferEntity> existing = candidateOfferRepository.findByCandidateId(candidate.getId());
-            if (existing.isPresent() && !REGENERATABLE.contains(existing.get().getStatus())) {
-                // SCL_41: once an offer has been submitted/sent, the recruiter cannot generate/send it again.
-                throw new CommonException("Candidate '" + candidate.getName() + "' already has an offer in progress (" + existing.get().getStatus() + ").");
+            if (existing.isPresent()) {
+                OfferStatus existingStatus = existing.get().getStatus();
+                // SCL_41: block only after candidate has accepted or rejected
+                if (TERMINAL.contains(existingStatus)) {
+                    throw new CommonException("Candidate '" + candidate.getName() + "' has already "
+                            + existingStatus.name().toLowerCase() + " the offer; a new version cannot be sent.");
+                }
             }
 
             String html = renderOfferHtml(candidate, template, request.getAcceptBeforeDate(), request.getJoiningDate());
@@ -97,12 +102,17 @@ public class OfferService {
             String storedPath = fileStorageService.storeBytes(pdfBytes, OFFER_FOLDER, fileName);
 
             CandidateOfferEntity offer = existing.orElse(CandidateOfferEntity.builder().candidateId(candidate.getId()).build());
+            // SCL_41: invalidate any previously emailed accept/reject link immediately on regenerate
+            archiveAcceptToken(offer);
             offer.setTemplateId(template.getId());
             offer.setAcceptBeforeDate(request.getAcceptBeforeDate());
             offer.setJoiningDate(request.getJoiningDate());
             offer.setOfferFileUrl(storedPath);
             offer.setStatus(OfferStatus.GENERATED);
             offer.setApprovalComments(null);
+            offer.setAcceptToken(null);
+            offer.setSentDate(null);
+            offer.setDecidedDate(null);
             candidateOfferRepository.save(offer);
 
             results.add(toDto(offer, candidate));
@@ -110,15 +120,25 @@ public class OfferService {
         return results;
     }
 
-    /** SCL_36: render the letter for review without saving/sending anything. */
+    /** SCL_36: render the letter for review without saving/sending. Candidate optional (placeholders). */
     public String previewOffer(OfferPreviewRequest request) {
-        CandidateEntity candidate = candidateRepository.findById(request.getCandidateId())
-                .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
         OfferTemplateEntity template = offerTemplateRepository.findById(request.getTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Offer template not found"));
-        LocalDate acceptBefore = request.getAcceptBeforeDate() != null ? request.getAcceptBeforeDate() : LocalDate.now().plusDays(3);
-        LocalDate joining = request.getJoiningDate() != null ? request.getJoiningDate() : LocalDate.now().plusDays(14);
-        return renderOfferHtml(candidate, template, acceptBefore, joining);
+
+        // Only use real dates when the UI actually supplied them; otherwise keep <> placeholders.
+        LocalDate acceptBefore = request.getAcceptBeforeDate();
+        LocalDate joining = request.getJoiningDate();
+
+        if (request.getCandidateId() == null) {
+            return renderOfferHtmlWithPlaceholders(template, acceptBefore, joining);
+        }
+
+        CandidateEntity candidate = candidateRepository.findById(request.getCandidateId())
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
+        // Candidate selected but dates still optional in preview - fall back to sample dates only for rendering.
+        LocalDate accept = acceptBefore != null ? acceptBefore : LocalDate.now().plusDays(3);
+        LocalDate join = joining != null ? joining : LocalDate.now().plusDays(14);
+        return renderOfferHtml(candidate, template, accept, join);
     }
 
     @Transactional
@@ -169,19 +189,34 @@ public class OfferService {
         }
     }
 
-    /** Candidate-facing send: only happens once, right after L2 approval. */
+    /** Candidate-facing send: after L2 approval. Rotates accept token so prior email links stop working. */
     private void sendApprovedOffer(CandidateOfferEntity offer) {
         CandidateEntity candidate = candidateRepository.findById(offer.getCandidateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
+        archiveAcceptToken(offer);
         offer.setStatus(OfferStatus.SENT);
         offer.setAcceptToken(UUID.randomUUID());
         offer.setSentDate(LocalDateTime.now());
+        offer.setDecidedDate(null);
 
         try {
             byte[] pdfBytes = fileStorageService.load(offer.getOfferFileUrl()).getInputStream().readAllBytes();
             sendOfferEmail(candidate, offer, pdfBytes);
         } catch (Exception e) {
             log.warn("Failed to send offer email: {}", e.getMessage());
+        }
+    }
+
+    private void archiveAcceptToken(CandidateOfferEntity offer) {
+        if (offer.getAcceptToken() == null) {
+            return;
+        }
+        String token = offer.getAcceptToken().toString();
+        String existing = offer.getSupersededTokens();
+        if (existing == null || existing.isBlank()) {
+            offer.setSupersededTokens(token);
+        } else if (!existing.contains(token)) {
+            offer.setSupersededTokens(existing + "," + token);
         }
     }
 
@@ -210,12 +245,21 @@ public class OfferService {
     public String decide(UUID token, boolean accept) {
         Optional<CandidateOfferEntity> offerOpt = candidateOfferRepository.findByAcceptToken(token);
         if (offerOpt.isEmpty()) {
+            // SCL_41: prior email links after a newer send
+            if (candidateOfferRepository.findBySupersededTokenContaining(token.toString()).isPresent()) {
+                return "SUPERSEDED";
+            }
             return "INVALID";
         }
         CandidateOfferEntity offer = offerOpt.get();
 
         if (offer.getStatus() == OfferStatus.ACCEPTED || offer.getStatus() == OfferStatus.REJECTED) {
             return offer.getStatus().name();
+        }
+
+        if (offer.getStatus() != OfferStatus.SENT && offer.getStatus() != OfferStatus.EXPIRED) {
+            // Token matches a draft that was regenerated / not the live sent offer
+            return "SUPERSEDED";
         }
 
         if (LocalDate.now().isAfter(offer.getAcceptBeforeDate())) {
@@ -250,6 +294,23 @@ public class OfferService {
         return templateEngine.process("offer/" + templateName, context);
     }
 
+    private String renderOfferHtmlWithPlaceholders(OfferTemplateEntity template, LocalDate acceptBeforeDate, LocalDate joiningDate) {
+        Context context = new Context();
+        context.setVariable("candidateName", "<Candidate_Name>");
+        context.setVariable("candidateEmail", "<Candidate_Email>");
+        context.setVariable("candidatePhone", "<Candidate_Phone>");
+        context.setVariable("positionTitle", "<Position_Title>");
+        context.setVariable("department", "<Department>");
+        context.setVariable("location", "<Location>");
+        context.setVariable("salary", "<Agreed_CTC>");
+        context.setVariable("acceptBeforeDate", acceptBeforeDate != null ? acceptBeforeDate.toString() : "<Accept_Before_Date>");
+        context.setVariable("joiningDate", joiningDate != null ? joiningDate.toString() : "<Joining_Date>");
+        context.setVariable("companyName", companyName);
+
+        String templateName = template.getFileName().replace(".html", "");
+        return templateEngine.process("offer/" + templateName, context);
+    }
+
     private void sendOfferEmail(CandidateEntity candidate, CandidateOfferEntity offer, byte[] pdfBytes) {
         try {
             String acceptUrl = appBaseUrl + "/api/v1/public/offers/" + offer.getAcceptToken() + "/accept";
@@ -263,7 +324,8 @@ public class OfferService {
                     + "<a href='" + acceptUrl + "' style='background:#208bbd;color:#fff;padding:10px 24px;text-decoration:none;border-radius:4px;margin-right:12px;'>Accept Offer</a>"
                     + "<a href='" + rejectUrl + "' style='background:#a20e37;color:#fff;padding:10px 24px;text-decoration:none;border-radius:4px;'>Reject Offer</a>"
                     + "</p>"
-                    + "<p style='color:#888;font-size:12px;margin-top:16px;'>This link will expire after " + offer.getAcceptBeforeDate() + ".</p>";
+                    + "<p style='color:#888;font-size:12px;margin-top:16px;'>This link will expire after " + offer.getAcceptBeforeDate()
+                    + ". If you receive a newer offer email, earlier links will no longer work.</p>";
 
             mailService.sendHtmlEmail(candidate.getEmail(), "Your Offer Letter", html, pdfBytes, "offer-letter.pdf");
         } catch (Exception e) {

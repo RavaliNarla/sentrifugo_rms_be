@@ -16,7 +16,7 @@ import java.util.UUID;
 @AllArgsConstructor
 public class OfferPreviewRequest {
 
-    @NotNull(message = "Candidate is required")
+    /** Optional - when omitted, placeholders like &lt;Candidate_Name&gt; are used. */
     private UUID candidateId;
 
     @NotNull(message = "Offer template is required")

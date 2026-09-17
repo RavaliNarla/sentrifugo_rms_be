@@ -45,4 +45,9 @@ public class InterviewScheduleEntity extends BaseEntity<UUID> {
     @Column(name = "duration_minutes")
     @Builder.Default
     private Integer durationMinutes = 30;
+
+    /** Interview round number (1 = first schedule; increments on Schedule Next Round). */
+    @Column(name = "round", nullable = false)
+    @Builder.Default
+    private Integer round = 1;
 }

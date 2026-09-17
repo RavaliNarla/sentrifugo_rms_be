@@ -101,4 +101,11 @@ public class JobRequisitionController {
         jobRequisitionService.unmarkFulfilled(id);
         return ResponseEntity.ok(ApiResponse.ok("Requisition reopened successfully"));
     }
+
+    @Operation(summary = "SCL_53: Approval history for a requisition (for the Job Postings history modal)")
+    @GetMapping("/{id}/approval-history")
+    public ResponseEntity<ApiResponse<List<com.sentrifugo.rms.recruiterportal.dto.RequisitionApprovalHistoryDTO>>> getApprovalHistory(
+            @PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok(jobRequisitionService.getApprovalHistory(id), "Approval history fetched successfully"));
+    }
 }

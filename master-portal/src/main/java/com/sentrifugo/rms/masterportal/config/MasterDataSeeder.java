@@ -162,7 +162,8 @@ public class MasterDataSeeder implements CommandLineRunner {
 
     private void seedCertifications() {
         for (String name : CERTIFICATIONS) {
-            if (!certificationRepository.existsByNameIgnoreCase(name)) {
+            // Soft-deleted rows still hold the unique name; check including inactive.
+            if (!certificationRepository.existsByNameIgnoreCaseIncludingInactive(name)) {
                 certificationRepository.save(CertificationEntity.builder().name(name).build());
             }
         }

@@ -11,5 +11,9 @@ import java.util.UUID;
 @Repository
 public interface PanelMemberScoreRepository extends JpaRepository<PanelMemberScoreEntity, UUID> {
     List<PanelMemberScoreEntity> findByCandidateId(UUID candidateId);
-    Optional<PanelMemberScoreEntity> findByCandidateIdAndPanelMemberId(UUID candidateId, UUID panelMemberId);
+
+    List<PanelMemberScoreEntity> findByCandidateIdAndRound(UUID candidateId, Integer round);
+
+    Optional<PanelMemberScoreEntity> findByCandidateIdAndPanelMemberIdAndRound(
+            UUID candidateId, UUID panelMemberId, Integer round);
 }

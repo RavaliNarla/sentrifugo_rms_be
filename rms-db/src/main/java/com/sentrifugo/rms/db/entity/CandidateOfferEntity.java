@@ -56,6 +56,10 @@ public class CandidateOfferEntity extends BaseEntity<UUID> {
     @Column(name = "accept_token", unique = true)
     private UUID acceptToken;
 
+    /** Comma-separated prior accept tokens (SCL_41) so old email links resolve to SUPERSEDED. */
+    @Column(name = "superseded_tokens", length = 4000)
+    private String supersededTokens;
+
     @Column(name = "sent_date")
     private LocalDateTime sentDate;
 

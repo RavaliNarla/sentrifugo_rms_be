@@ -15,4 +15,8 @@ public interface CandidateOfferRepository extends JpaRepository<CandidateOfferEn
     Optional<CandidateOfferEntity> findByAcceptToken(UUID acceptToken);
     List<CandidateOfferEntity> findByCandidateIdIn(List<UUID> candidateIds);
     List<CandidateOfferEntity> findByStatus(OfferStatus status);
+
+    @org.springframework.data.jpa.repository.Query(
+            "SELECT o FROM CandidateOfferEntity o WHERE o.supersededTokens IS NOT NULL AND o.supersededTokens LIKE CONCAT('%', :token, '%')")
+    Optional<CandidateOfferEntity> findBySupersededTokenContaining(@org.springframework.data.repository.query.Param("token") String token);
 }

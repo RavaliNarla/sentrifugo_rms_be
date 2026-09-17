@@ -122,14 +122,11 @@ public class CandidateService {
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found")));
     }
 
-    /** SCL_25: shortlist decision is Yes / No / On Hold, not a single Shortlist button. */
+    /** Shortlist decision (Yes / No / On Hold) — allowed from any status so recruiters can correct earlier choices. */
     @Transactional
     public void decide(UUID id, ShortlistDecisionRequest.Decision decision) {
         CandidateEntity entity = candidateRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
-        if (entity.getStatus() != CandidateStatus.ADDED && entity.getStatus() != CandidateStatus.ON_HOLD) {
-            throw new CommonException("Only candidates that are Applied or On Hold can have a shortlist decision recorded.");
-        }
         entity.setStatus(switch (decision) {
             case SHORTLIST -> CandidateStatus.SHORTLISTED;
             case REJECT -> CandidateStatus.NOT_SHORTLISTED;

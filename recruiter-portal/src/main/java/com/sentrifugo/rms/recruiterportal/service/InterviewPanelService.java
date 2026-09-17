@@ -7,7 +7,7 @@ import com.sentrifugo.rms.db.entity.InterviewPanelMemberEntity;
 import com.sentrifugo.rms.db.entity.UserEntity;
 import com.sentrifugo.rms.db.repository.InterviewPanelMemberRepository;
 import com.sentrifugo.rms.db.repository.InterviewPanelRepository;
-import com.sentrifugo.rms.db.repository.PositionPanelRepository;
+import com.sentrifugo.rms.db.repository.InterviewScheduleRepository;
 import com.sentrifugo.rms.db.repository.UserRepository;
 import com.sentrifugo.rms.recruiterportal.dto.InterviewPanelDTO;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +26,7 @@ public class InterviewPanelService {
     private final InterviewPanelRepository interviewPanelRepository;
     private final InterviewPanelMemberRepository interviewPanelMemberRepository;
     private final UserRepository userRepository;
-    private final PositionPanelRepository positionPanelRepository;
+    private final InterviewScheduleRepository interviewScheduleRepository;
 
     @Transactional
     public InterviewPanelDTO create(InterviewPanelDTO dto) {
@@ -51,8 +51,8 @@ public class InterviewPanelService {
 
     @Transactional
     public void delete(UUID id) {
-        if (positionPanelRepository.existsByPanelId(id)) {
-            throw new CommonException("Cannot delete a panel that is assigned to a position.");
+        if (interviewScheduleRepository.existsByPanelId(id)) {
+            throw new CommonException("Cannot delete a panel that already has interview schedules.");
         }
         interviewPanelMemberRepository.deleteByPanelId(id);
         interviewPanelRepository.deleteById(id);

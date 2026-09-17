@@ -31,6 +31,11 @@ public class PanelMemberScoreEntity extends BaseEntity<UUID> {
     @Column(name = "panel_member_id", nullable = false)
     private UUID panelMemberId;
 
+    /** Matches interview_schedule.round; prior rounds kept for audit. */
+    @Column(name = "round", nullable = false)
+    @lombok.Builder.Default
+    private Integer round = 1;
+
     /** Rating scale 1-10, pass mark 5 (Section 14 of the requirements doc). */
     @Column(name = "score", precision = 5, scale = 2, nullable = false)
     private BigDecimal score;

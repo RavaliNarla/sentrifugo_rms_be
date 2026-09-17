@@ -58,6 +58,11 @@ public class PublicOfferController {
                 message = "The accept-before date for this offer has passed and this link is no longer valid.";
                 color = "#888888";
             }
+            case "SUPERSEDED" -> {
+                title = "Link No Longer Valid";
+                message = "A newer version of this offer has been sent. Please use the Accept / Reject links in the most recent email.";
+                color = "#888888";
+            }
             default -> {
                 title = "Invalid Link";
                 message = "This offer link is invalid or no longer exists.";

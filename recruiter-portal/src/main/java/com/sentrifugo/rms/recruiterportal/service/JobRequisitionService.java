@@ -5,16 +5,19 @@ import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
 import com.sentrifugo.rms.common.service.MailService;
 import com.sentrifugo.rms.common.util.SecurityUtils;
 import com.sentrifugo.rms.db.entity.JobRequisitionEntity;
+import com.sentrifugo.rms.db.entity.RequisitionApprovalHistoryEntity;
 import com.sentrifugo.rms.db.entity.RequisitionApproverEntity;
 import com.sentrifugo.rms.db.entity.UserEntity;
 import com.sentrifugo.rms.db.enums.ApproverRole;
 import com.sentrifugo.rms.db.enums.RequisitionStatus;
 import com.sentrifugo.rms.db.repository.JobPositionRepository;
 import com.sentrifugo.rms.db.repository.JobRequisitionRepository;
+import com.sentrifugo.rms.db.repository.RequisitionApprovalHistoryRepository;
 import com.sentrifugo.rms.db.repository.RequisitionApproverRepository;
 import com.sentrifugo.rms.db.repository.UserRepository;
 import com.sentrifugo.rms.recruiterportal.dto.ApprovalActionRequest;
 import com.sentrifugo.rms.recruiterportal.dto.JobRequisitionDTO;
+import com.sentrifugo.rms.recruiterportal.dto.RequisitionApprovalHistoryDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -36,6 +39,7 @@ public class JobRequisitionService {
     private final JobRequisitionRepository jobRequisitionRepository;
     private final JobPositionRepository jobPositionRepository;
     private final RequisitionApproverRepository requisitionApproverRepository;
+    private final RequisitionApprovalHistoryRepository approvalHistoryRepository;
     private final UserRepository userRepository;
     private final SecurityUtils securityUtils;
     private final MailService mailService;
@@ -68,6 +72,7 @@ public class JobRequisitionService {
         entity.setDescription(dto.getDescription());
         entity.setStartDate(dto.getStartDate());
         entity.setExpectedFulfilmentDate(dto.getExpectedFulfilmentDate());
+        // Keep rejected status as-is after edit-save (do not reset to NEW).
         return toDto(jobRequisitionRepository.save(entity));
     }
 
@@ -126,8 +131,27 @@ public class JobRequisitionService {
         )).stream().map(this::toDto).collect(Collectors.toList());
     }
 
+    /** SCL_53: chronological approval trail for the Job Postings history modal. */
+    public List<RequisitionApprovalHistoryDTO> getApprovalHistory(UUID requisitionId) {
+        if (!jobRequisitionRepository.existsById(requisitionId)) {
+            throw new ResourceNotFoundException("Requisition not found");
+        }
+        return approvalHistoryRepository.findByRequisitionIdOrderByCreatedDateDesc(requisitionId).stream()
+                .map(h -> RequisitionApprovalHistoryDTO.builder()
+                        .id(h.getId())
+                        .approverName(h.getApproverName())
+                        .approvalDate(h.getCreatedDate())
+                        .status(h.getStatus())
+                        .comments(h.getComments())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public void submitForApproval(List<UUID> requisitionIds) {
+        UUID currentUserId = securityUtils.getCurrentUserId();
+        String actorName = resolveUserName(currentUserId);
+
         List<JobRequisitionEntity> requisitions = jobRequisitionRepository.findAllById(requisitionIds);
         for (JobRequisitionEntity requisition : requisitions) {
             if (requisition.getStatus() != RequisitionStatus.NEW
@@ -139,6 +163,7 @@ public class JobRequisitionService {
                 throw new CommonException("Requisition '" + requisition.getTitle() + "' has no positions. Add at least one position before submitting.");
             }
             requisition.setStatus(RequisitionStatus.L1_PENDING);
+            recordHistory(requisition.getId(), currentUserId, actorName, RequisitionStatus.L1_PENDING.name(), null);
         }
         jobRequisitionRepository.saveAll(requisitions);
         notifyApprover(ApproverRole.L1, "Requisition(s) submitted for your L1 approval.");
@@ -149,6 +174,7 @@ public class JobRequisitionService {
         UUID currentUserId = securityUtils.getCurrentUserId();
         RequisitionApproverEntity approver = requisitionApproverRepository.findByApproverId(currentUserId)
                 .orElseThrow(() -> new CommonException("You are not configured as an L1/L2 approver."));
+        String actorName = resolveUserName(currentUserId);
 
         List<JobRequisitionEntity> requisitions = jobRequisitionRepository.findAllById(request.getRequisitionIds());
 
@@ -171,6 +197,7 @@ public class JobRequisitionService {
                 }
             }
             requisition.setComments(request.getComments());
+            recordHistory(requisition.getId(), currentUserId, actorName, requisition.getStatus().name(), request.getComments());
         }
         jobRequisitionRepository.saveAll(requisitions);
 
@@ -200,6 +227,23 @@ public class JobRequisitionService {
         }
         entity.setStatus(RequisitionStatus.APPROVED);
         jobRequisitionRepository.save(entity);
+    }
+
+    private void recordHistory(UUID requisitionId, UUID actorId, String actorName, String status, String comments) {
+        approvalHistoryRepository.save(RequisitionApprovalHistoryEntity.builder()
+                .requisitionId(requisitionId)
+                .approverId(actorId)
+                .approverName(actorName)
+                .status(status)
+                .comments(comments)
+                .build());
+    }
+
+    private String resolveUserName(UUID userId) {
+        if (userId == null) {
+            return "Unknown";
+        }
+        return userRepository.findById(userId).map(UserEntity::getName).orElse("Unknown");
     }
 
     private void notifyApprover(ApproverRole role, String message) {
