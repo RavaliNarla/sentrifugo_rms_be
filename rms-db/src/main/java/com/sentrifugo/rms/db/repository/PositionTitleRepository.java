@@ -10,4 +10,8 @@ import java.util.UUID;
 @Repository
 public interface PositionTitleRepository extends JpaRepository<PositionTitleEntity, UUID> {
     List<PositionTitleEntity> findAllByOrderByNameAsc();
+
+    List<PositionTitleEntity> findAllByDepartmentIdOrderByNameAsc(UUID departmentId);
+
+    boolean existsByNameIgnoreCaseAndDepartmentId(String name, UUID departmentId);
 }

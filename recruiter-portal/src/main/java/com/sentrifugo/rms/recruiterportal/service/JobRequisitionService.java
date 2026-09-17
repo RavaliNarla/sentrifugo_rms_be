@@ -42,6 +42,7 @@ public class JobRequisitionService {
 
     @Transactional
     public JobRequisitionDTO create(JobRequisitionDTO dto) {
+        validateDates(dto);
         JobRequisitionEntity entity = JobRequisitionEntity.builder()
                 .title(dto.getTitle())
                 .description(dto.getDescription())
@@ -62,11 +63,38 @@ public class JobRequisitionService {
                 && entity.getStatus() != RequisitionStatus.L2_REJECTED) {
             throw new CommonException("Only requisitions in NEW/REJECTED state can be edited.");
         }
+        validateDates(dto);
         entity.setTitle(dto.getTitle());
         entity.setDescription(dto.getDescription());
         entity.setStartDate(dto.getStartDate());
         entity.setExpectedFulfilmentDate(dto.getExpectedFulfilmentDate());
         return toDto(jobRequisitionRepository.save(entity));
+    }
+
+    /** SCL_02: Start Date and Expected Fulfilment Date must both be future dates (and fulfilment on/after start). */
+    private void validateDates(JobRequisitionDTO dto) {
+        LocalDate today = LocalDate.now();
+        if (dto.getStartDate() != null && dto.getStartDate().isBefore(today)) {
+            throw new CommonException("Start Date must be a future date.");
+        }
+        if (dto.getExpectedFulfilmentDate() != null && dto.getExpectedFulfilmentDate().isBefore(today)) {
+            throw new CommonException("Expected Fulfilment Date must be a future date.");
+        }
+        if (dto.getStartDate() != null && dto.getExpectedFulfilmentDate() != null
+                && dto.getExpectedFulfilmentDate().isBefore(dto.getStartDate())) {
+            throw new CommonException("Expected Fulfilment Date cannot be before the Start Date.");
+        }
+    }
+
+    @Transactional
+    public void delete(UUID id) {
+        JobRequisitionEntity entity = jobRequisitionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Requisition not found"));
+        if (entity.getStatus() != RequisitionStatus.NEW) {
+            throw new CommonException("Only requisitions in NEW status (not yet submitted/approved) can be deleted.");
+        }
+        jobPositionRepository.findByRequisitionId(id).forEach(jobPositionRepository::delete);
+        jobRequisitionRepository.delete(entity);
     }
 
     public JobRequisitionDTO getById(UUID id) {
@@ -159,6 +187,18 @@ public class JobRequisitionService {
             throw new CommonException("Only approved requisitions can be marked as fulfilled.");
         }
         entity.setStatus(RequisitionStatus.FULFILLED);
+        jobRequisitionRepository.save(entity);
+    }
+
+    /** Undo "Mark Fulfilled" - reopens the requisition back to APPROVED. */
+    @Transactional
+    public void unmarkFulfilled(UUID id) {
+        JobRequisitionEntity entity = jobRequisitionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Requisition not found"));
+        if (entity.getStatus() != RequisitionStatus.FULFILLED) {
+            throw new CommonException("Only fulfilled requisitions can be reopened.");
+        }
+        entity.setStatus(RequisitionStatus.APPROVED);
         jobRequisitionRepository.save(entity);
     }
 

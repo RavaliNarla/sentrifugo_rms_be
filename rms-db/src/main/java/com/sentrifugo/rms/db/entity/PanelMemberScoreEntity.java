@@ -31,9 +31,15 @@ public class PanelMemberScoreEntity extends BaseEntity<UUID> {
     @Column(name = "panel_member_id", nullable = false)
     private UUID panelMemberId;
 
+    /** Rating scale 1-10, pass mark 5 (Section 14 of the requirements doc). */
     @Column(name = "score", precision = 5, scale = 2, nullable = false)
     private BigDecimal score;
 
-    @Column(name = "comments", columnDefinition = "TEXT")
-    private String comments;
+    /** Renamed from "Comment" - interviewer must justify the score given. */
+    @Column(name = "rationale", columnDefinition = "TEXT")
+    private String rationale;
+
+    /** SELECT / REJECT / HOLD. */
+    @Column(name = "decision")
+    private String decision;
 }

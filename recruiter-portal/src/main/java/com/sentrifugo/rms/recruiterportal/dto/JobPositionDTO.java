@@ -31,10 +31,25 @@ public class JobPositionDTO {
 
     private String jobDescription;
 
+    /** Manually-entered on the position itself - distinct from the Position Master's own copy (see Section 6 of the requirements doc). */
+    private String rolesResponsibilities;
+
     private UUID educationQualificationId;
     private String educationQualificationName;
 
+    /** Optional - see SpecializationDTO. Only meaningful when educationQualificationId is set. */
+    private UUID specializationId;
+    private String specializationName;
+
     private Integer experienceYears;
+
+    /** Optional, non-mandatory per the requirements doc - free text, useful for roles requiring certifications. */
+    private String certifications;
+
+    private Boolean medicalFitnessRequired;
+
+    /** Only applicable/shown when employmentType = CONTRACT. */
+    private String contractualPeriod;
 
     private String employmentType;
 
@@ -44,6 +59,9 @@ public class JobPositionDTO {
 
     private UUID approvedById;
     private String approvedByName;
+
+    /** Free-text approver name, used when the selected Approved-By role is "Others". */
+    private String approvedByOtherText;
 
     private LocalDate approvedOn;
 

@@ -1,5 +1,6 @@
 package com.sentrifugo.rms.recruiterportal.dto;
 
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -8,18 +9,19 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 import java.util.UUID;
 
+/** Renders the offer letter HTML for review, without saving/emailing anything (SCL_36). */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CandidateOfferDTO {
-    private UUID id;
+public class OfferPreviewRequest {
+
+    @NotNull(message = "Candidate is required")
     private UUID candidateId;
-    private String candidateName;
-    private String positionTitleName;
+
+    @NotNull(message = "Offer template is required")
+    private UUID templateId;
+
     private LocalDate acceptBeforeDate;
     private LocalDate joiningDate;
-    private String offerFileUrl;
-    private String status;
-    private String approvalComments;
 }

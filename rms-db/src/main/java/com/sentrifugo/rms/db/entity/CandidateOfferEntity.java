@@ -39,8 +39,14 @@ public class CandidateOfferEntity extends BaseEntity<UUID> {
     @Column(name = "accept_before_date", nullable = false)
     private LocalDate acceptBeforeDate;
 
+    @Column(name = "joining_date")
+    private LocalDate joiningDate;
+
     @Column(name = "offer_file_url")
     private String offerFileUrl;
+
+    @Column(name = "approval_comments", columnDefinition = "TEXT")
+    private String approvalComments;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false)

@@ -3,6 +3,7 @@ package com.sentrifugo.rms.db.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -13,8 +14,14 @@ import org.hibernate.annotations.Where;
 
 import java.util.UUID;
 
+/**
+ * Position Master (Section 5 of the requirements doc): pre-defines positions per
+ * department so the Add Position screen can auto-populate the Positions dropdown
+ * from the selected Department, and prefill Job Description / Minimum Experience.
+ */
 @Entity
-@Table(name = "position_titles", schema = "common")
+@Table(name = "position_titles", schema = "common",
+        uniqueConstraints = @UniqueConstraint(columnNames = {"name", "department_id"}))
 @Data
 @SuperBuilder
 @NoArgsConstructor
@@ -24,6 +31,15 @@ import java.util.UUID;
 @Where(clause = "is_active = true")
 public class PositionTitleEntity extends BaseEntity<UUID> {
 
-    @Column(name = "name", nullable = false, unique = true)
+    @Column(name = "name", nullable = false)
     private String name;
+
+    @Column(name = "department_id")
+    private UUID departmentId;
+
+    @Column(name = "job_description", columnDefinition = "TEXT")
+    private String jobDescription;
+
+    @Column(name = "minimum_experience_years")
+    private Integer minimumExperienceYears;
 }

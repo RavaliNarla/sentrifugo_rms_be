@@ -25,4 +25,7 @@ public class GenerateOfferRequest {
 
     @NotNull(message = "Accept-before date is required")
     private LocalDate acceptBeforeDate;
+
+    @NotNull(message = "Joining date is required")
+    private LocalDate joiningDate;
 }

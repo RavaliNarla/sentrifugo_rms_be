@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -24,7 +25,8 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class InterviewPoolService {
 
-    private static final BigDecimal PASS_MARK = BigDecimal.valueOf(50);
+    /** Rating scale 1-10, pass mark 5 (Section 14 of the requirements doc). */
+    private static final BigDecimal PASS_MARK = BigDecimal.valueOf(5);
 
     private final CandidateRepository candidateRepository;
     private final InterviewScheduleRepository interviewScheduleRepository;
@@ -37,11 +39,11 @@ public class InterviewPoolService {
         List<CandidateStatus> effectiveStatuses = statuses != null && !statuses.isEmpty() ? statuses :
                 List.of(CandidateStatus.SCHEDULED, CandidateStatus.QUALIFIED, CandidateStatus.DISQUALIFIED);
         Page<CandidateEntity> candidatesPage = candidateRepository.search(positionId, effectiveStatuses, searchText, PageRequest.of(page, size));
-        return candidatesPage.map(this::toDto);
+        return candidatesPage.map(c -> toDto(c, null));
     }
 
-    /** Candidates for the currently logged-in interviewer's panel(s), for a given position. */
-    public List<InterviewScheduleDTO> getMyInterviews(UUID positionId) {
+    /** Candidates for the currently logged-in interviewer's panel(s), for a given position, optionally filtered to one interview date. */
+    public List<InterviewScheduleDTO> getMyInterviews(UUID positionId, LocalDate interviewDate) {
         UUID currentUserId = securityUtils.getCurrentUserId();
         List<UUID> myPanelIds = interviewPanelMemberRepository.findAll().stream()
                 .filter(m -> m.getUserId().equals(currentUserId))
@@ -53,8 +55,9 @@ public class InterviewPoolService {
                 "", PageRequest.of(0, 500));
 
         return candidatesPage.getContent().stream()
-                .map(this::toDto)
+                .map(c -> toDto(c, currentUserId))
                 .filter(dto -> dto.getPanelId() != null && myPanelIds.contains(dto.getPanelId()))
+                .filter(dto -> interviewDate == null || interviewDate.equals(dto.getInterviewDate()))
                 .collect(Collectors.toList());
     }
 
@@ -74,7 +77,8 @@ public class InterviewPoolService {
                         .panelMemberId(panelMemberId)
                         .build());
         score.setScore(request.getScore());
-        score.setComments(request.getComments());
+        score.setRationale(request.getRationale());
+        score.setDecision(request.getDecision());
         panelMemberScoreRepository.save(score);
 
         List<UUID> panelMemberIds = interviewPanelMemberRepository.findByPanelId(schedule.getPanelId()).stream()
@@ -96,17 +100,31 @@ public class InterviewPoolService {
         }
     }
 
-    private InterviewScheduleDTO toDto(CandidateEntity candidate) {
+    private InterviewScheduleDTO toDto(CandidateEntity candidate, UUID currentUserId) {
         InterviewScheduleEntity schedule = interviewScheduleRepository.findByCandidateId(candidate.getId()).orElse(null);
         String panelName = null;
         int membersTotal = 0;
         int membersScored = 0;
         UUID panelId = null;
+        Integer myScore = null;
+        String myRationale = null;
+        String myDecision = null;
         if (schedule != null) {
             panelId = schedule.getPanelId();
             panelName = interviewPanelRepository.findById(schedule.getPanelId()).map(InterviewPanelEntity::getName).orElse(null);
             membersTotal = interviewPanelMemberRepository.findByPanelId(schedule.getPanelId()).size();
-            membersScored = panelMemberScoreRepository.findByCandidateId(candidate.getId()).size();
+            List<PanelMemberScoreEntity> allScores = panelMemberScoreRepository.findByCandidateId(candidate.getId());
+            membersScored = allScores.size();
+            if (currentUserId != null) {
+                PanelMemberScoreEntity mine = allScores.stream()
+                        .filter(s -> s.getPanelMemberId().equals(currentUserId))
+                        .findFirst().orElse(null);
+                if (mine != null) {
+                    myScore = mine.getScore() != null ? mine.getScore().intValue() : null;
+                    myRationale = mine.getRationale();
+                    myDecision = mine.getDecision();
+                }
+            }
         }
         return InterviewScheduleDTO.builder()
                 .candidateId(candidate.getId())
@@ -121,6 +139,9 @@ public class InterviewPoolService {
                 .finalScore(candidate.getFinalScore())
                 .membersScored(membersScored)
                 .membersTotal(membersTotal)
+                .myScore(myScore)
+                .myRationale(myRationale)
+                .myDecision(myDecision)
                 .build();
     }
 }

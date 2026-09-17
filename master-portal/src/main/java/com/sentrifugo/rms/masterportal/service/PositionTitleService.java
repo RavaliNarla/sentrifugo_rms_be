@@ -1,9 +1,11 @@
 package com.sentrifugo.rms.masterportal.service;
 
+import com.sentrifugo.rms.common.exception.CommonException;
 import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
 import com.sentrifugo.rms.db.entity.PositionTitleEntity;
+import com.sentrifugo.rms.db.repository.DepartmentRepository;
 import com.sentrifugo.rms.db.repository.PositionTitleRepository;
-import com.sentrifugo.rms.masterportal.dto.NamedMasterDTO;
+import com.sentrifugo.rms.masterportal.dto.PositionTitleDTO;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -16,24 +18,45 @@ import java.util.stream.Collectors;
 public class PositionTitleService {
 
     private final PositionTitleRepository repository;
+    private final DepartmentRepository departmentRepository;
 
-    public List<NamedMasterDTO> getAll() {
-        return repository.findAllByOrderByNameAsc().stream()
-                .map(e -> NamedMasterDTO.builder().id(e.getId()).name(e.getName()).build())
+    public List<PositionTitleDTO> getAll() {
+        return repository.findAllByOrderByNameAsc().stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    public List<PositionTitleDTO> getByDepartment(UUID departmentId) {
+        return repository.findAllByDepartmentIdOrderByNameAsc(departmentId).stream()
+                .map(this::toDto)
                 .collect(Collectors.toList());
     }
 
-    public NamedMasterDTO add(NamedMasterDTO dto) {
-        PositionTitleEntity entity = repository.save(PositionTitleEntity.builder().name(dto.getName()).build());
-        return NamedMasterDTO.builder().id(entity.getId()).name(entity.getName()).build();
+    public PositionTitleDTO add(PositionTitleDTO dto) {
+        if (repository.existsByNameIgnoreCaseAndDepartmentId(dto.getName(), dto.getDepartmentId())) {
+            throw new CommonException("A position title with this name already exists in this department.");
+        }
+        PositionTitleEntity entity = PositionTitleEntity.builder()
+                .name(dto.getName())
+                .departmentId(dto.getDepartmentId())
+                .jobDescription(dto.getJobDescription())
+                .minimumExperienceYears(dto.getMinimumExperienceYears())
+                .build();
+        return toDto(repository.save(entity));
     }
 
-    public NamedMasterDTO update(UUID id, NamedMasterDTO dto) {
+    public PositionTitleDTO update(UUID id, PositionTitleDTO dto) {
         PositionTitleEntity entity = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Position title not found"));
+        if (!entity.getName().equalsIgnoreCase(dto.getName())
+                || !entity.getDepartmentId().equals(dto.getDepartmentId())) {
+            if (repository.existsByNameIgnoreCaseAndDepartmentId(dto.getName(), dto.getDepartmentId())) {
+                throw new CommonException("A position title with this name already exists in this department.");
+            }
+        }
         entity.setName(dto.getName());
-        repository.save(entity);
-        return NamedMasterDTO.builder().id(entity.getId()).name(entity.getName()).build();
+        entity.setDepartmentId(dto.getDepartmentId());
+        entity.setJobDescription(dto.getJobDescription());
+        entity.setMinimumExperienceYears(dto.getMinimumExperienceYears());
+        return toDto(repository.save(entity));
     }
 
     public void delete(UUID id) {
@@ -41,5 +64,18 @@ public class PositionTitleService {
             throw new ResourceNotFoundException("Position title not found");
         }
         repository.deleteById(id);
+    }
+
+    private PositionTitleDTO toDto(PositionTitleEntity entity) {
+        String departmentName = entity.getDepartmentId() == null ? null :
+                departmentRepository.findById(entity.getDepartmentId()).map(d -> d.getName()).orElse(null);
+        return PositionTitleDTO.builder()
+                .id(entity.getId())
+                .name(entity.getName())
+                .departmentId(entity.getDepartmentId())
+                .departmentName(departmentName)
+                .jobDescription(entity.getJobDescription())
+                .minimumExperienceYears(entity.getMinimumExperienceYears())
+                .build();
     }
 }

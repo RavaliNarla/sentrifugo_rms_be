@@ -28,4 +28,9 @@ public class InterviewScheduleDTO {
     private BigDecimal finalScore;
     private Integer membersScored;
     private Integer membersTotal;
+
+    /** The current interviewer's own previously-saved score/rationale/decision, if any (SCL_29). */
+    private Integer myScore;
+    private String myRationale;
+    private String myDecision;
 }

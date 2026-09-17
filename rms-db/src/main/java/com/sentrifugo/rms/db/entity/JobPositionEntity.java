@@ -45,11 +45,27 @@ public class JobPositionEntity extends BaseEntity<UUID> {
     @Column(name = "job_description", columnDefinition = "TEXT")
     private String jobDescription;
 
+    @Column(name = "roles_responsibilities", columnDefinition = "TEXT")
+    private String rolesResponsibilities;
+
     @Column(name = "education_qualification_id")
     private UUID educationQualificationId;
 
+    @Column(name = "specialization_id")
+    private UUID specializationId;
+
     @Column(name = "experience_years")
     private Integer experienceYears;
+
+    @Column(name = "certifications")
+    private String certifications;
+
+    @Column(name = "medical_fitness_required")
+    @Builder.Default
+    private Boolean medicalFitnessRequired = false;
+
+    @Column(name = "contractual_period")
+    private String contractualPeriod;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "employment_type")
@@ -65,6 +81,9 @@ public class JobPositionEntity extends BaseEntity<UUID> {
 
     @Column(name = "approved_by_id")
     private UUID approvedById;
+
+    @Column(name = "approved_by_other_text")
+    private String approvedByOtherText;
 
     @Column(name = "approved_on")
     private LocalDate approvedOn;

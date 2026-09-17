@@ -10,6 +10,7 @@ import com.sentrifugo.rms.db.repository.CandidateRepository;
 import com.sentrifugo.rms.db.repository.JobPositionRepository;
 import com.sentrifugo.rms.db.repository.PositionTitleRepository;
 import com.sentrifugo.rms.recruiterportal.dto.CandidateDTO;
+import com.sentrifugo.rms.recruiterportal.dto.ShortlistDecisionRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -19,6 +20,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -33,10 +35,15 @@ public class CandidateService {
     private static final String ID_PROOF_FOLDER = "id-proofs";
     private static final String PHOTO_FOLDER = "photos";
 
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[\\w.+-]+@[\\w-]+\\.[a-zA-Z]{2,}$");
+    private static final Pattern PHONE_PATTERN = Pattern.compile("^[0-9]{10}$");
+
     @Transactional
     public CandidateDTO add(CandidateDTO dto, MultipartFile resume, MultipartFile idProof, MultipartFile photo) {
         JobPositionEntity position = jobPositionRepository.findById(dto.getPositionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Position not found"));
+
+        validateContactFields(dto);
 
         CandidateEntity entity = CandidateEntity.builder()
                 .requisitionId(position.getRequisitionId())
@@ -60,6 +67,51 @@ public class CandidateService {
         return toDto(candidateRepository.save(entity));
     }
 
+    /** SCL_42: edit is only allowed for newly-added candidates (before any workflow progress). */
+    @Transactional
+    public CandidateDTO update(UUID id, CandidateDTO dto, MultipartFile resume, MultipartFile idProof, MultipartFile photo) {
+        CandidateEntity entity = candidateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
+        if (entity.getStatus() != CandidateStatus.ADDED) {
+            throw new CommonException("Only newly-added candidates can be edited.");
+        }
+        validateContactFields(dto);
+
+        entity.setName(dto.getName());
+        entity.setPhone(dto.getPhone());
+        entity.setEmail(dto.getEmail());
+        if (resume != null && !resume.isEmpty()) {
+            entity.setResumeUrl(fileStorageService.store(resume, RESUME_FOLDER));
+        }
+        if (idProof != null && !idProof.isEmpty()) {
+            entity.setIdProofUrl(fileStorageService.store(idProof, ID_PROOF_FOLDER));
+        }
+        if (photo != null && !photo.isEmpty()) {
+            entity.setPhotoUrl(fileStorageService.store(photo, PHOTO_FOLDER));
+        }
+        return toDto(candidateRepository.save(entity));
+    }
+
+    /** SCL_42: delete is only allowed for newly-added candidates. */
+    @Transactional
+    public void delete(UUID id) {
+        CandidateEntity entity = candidateRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
+        if (entity.getStatus() != CandidateStatus.ADDED) {
+            throw new CommonException("Only newly-added candidates can be deleted.");
+        }
+        candidateRepository.delete(entity);
+    }
+
+    private void validateContactFields(CandidateDTO dto) {
+        if (dto.getEmail() == null || !EMAIL_PATTERN.matcher(dto.getEmail()).matches()) {
+            throw new CommonException("Please enter a valid email address.");
+        }
+        if (dto.getPhone() == null || !PHONE_PATTERN.matcher(dto.getPhone()).matches()) {
+            throw new CommonException("Please enter a valid 10-digit phone number.");
+        }
+    }
+
     public Page<CandidateDTO> search(UUID positionId, List<CandidateStatus> statuses, String searchText, int page, int size) {
         return candidateRepository.search(positionId, statuses, searchText, PageRequest.of(page, size))
                 .map(this::toDto);
@@ -70,14 +122,19 @@ public class CandidateService {
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found")));
     }
 
+    /** SCL_25: shortlist decision is Yes / No / On Hold, not a single Shortlist button. */
     @Transactional
-    public void shortlist(UUID id) {
+    public void decide(UUID id, ShortlistDecisionRequest.Decision decision) {
         CandidateEntity entity = candidateRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
-        if (entity.getStatus() != CandidateStatus.ADDED) {
-            throw new CommonException("Only candidates in ADDED status can be shortlisted.");
+        if (entity.getStatus() != CandidateStatus.ADDED && entity.getStatus() != CandidateStatus.ON_HOLD) {
+            throw new CommonException("Only candidates that are Applied or On Hold can have a shortlist decision recorded.");
         }
-        entity.setStatus(CandidateStatus.SHORTLISTED);
+        entity.setStatus(switch (decision) {
+            case SHORTLIST -> CandidateStatus.SHORTLISTED;
+            case REJECT -> CandidateStatus.NOT_SHORTLISTED;
+            case HOLD -> CandidateStatus.ON_HOLD;
+        });
         candidateRepository.save(entity);
     }
 
@@ -114,6 +171,13 @@ public class CandidateService {
                 .status(entity.getStatus().name())
                 .finalScore(entity.getFinalScore())
                 .salary(entity.getSalary())
+                .currentCtc(entity.getCurrentCtc())
+                .expectedCtc(entity.getExpectedCtc())
+                .fixedPay(entity.getFixedPay())
+                .variablePay(entity.getVariablePay())
+                .bonus(entity.getBonus())
+                .compensationComments(entity.getCompensationComments())
+                .agreedCtc(entity.getAgreedCtc())
                 .build();
     }
 }

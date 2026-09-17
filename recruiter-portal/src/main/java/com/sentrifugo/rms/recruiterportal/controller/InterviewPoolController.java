@@ -39,10 +39,12 @@ public class InterviewPoolController {
                 "Interview pool fetched successfully"));
     }
 
-    @Operation(summary = "List candidates scheduled with the current interviewer's panel(s) for a position")
+    @Operation(summary = "List candidates scheduled with the current interviewer's panel(s) for a position, optionally filtered to one interview date")
     @GetMapping("/my-interviews")
-    public ResponseEntity<ApiResponse<List<InterviewScheduleDTO>>> myInterviews(@RequestParam UUID positionId) {
-        return ResponseEntity.ok(ApiResponse.ok(interviewPoolService.getMyInterviews(positionId), "Your interviews fetched successfully"));
+    public ResponseEntity<ApiResponse<List<InterviewScheduleDTO>>> myInterviews(
+            @RequestParam UUID positionId,
+            @RequestParam(required = false) java.time.LocalDate interviewDate) {
+        return ResponseEntity.ok(ApiResponse.ok(interviewPoolService.getMyInterviews(positionId, interviewDate), "Your interviews fetched successfully"));
     }
 
     @Operation(summary = "Submit a score/comment for a candidate as the currently logged-in panel member")

@@ -36,6 +36,8 @@ public class InterviewSchedulingService {
     private final CandidateRepository candidateRepository;
     private final InterviewPanelRepository interviewPanelRepository;
     private final InterviewScheduleRepository interviewScheduleRepository;
+    private final com.sentrifugo.rms.db.repository.JobPositionRepository jobPositionRepository;
+    private final com.sentrifugo.rms.db.repository.LocationRepository locationRepository;
     private final MailService mailService;
 
     private record Slot(UUID panelId, java.time.LocalDate date, LocalTime start, LocalTime end, int duration) {
@@ -111,10 +113,15 @@ public class InterviewSchedulingService {
     private void sendInterviewEmail(CandidateEntity candidate, Slot slot) {
         try {
             InterviewPanelEntity panel = interviewPanelRepository.findById(slot.panelId()).orElse(null);
+            // Interview location is the position's plant location (Section 11 of the requirements doc).
+            String location = jobPositionRepository.findById(candidate.getPositionId())
+                    .map(p -> locationRepository.findById(p.getLocationId()).map(l -> l.getName()).orElse(null))
+                    .orElse(null);
             String html = "<p>Dear " + candidate.getName() + ",</p>"
                     + "<p>Your interview has been scheduled.</p>"
                     + "<p><b>Date:</b> " + slot.date() + "<br/>"
                     + "<b>Time:</b> " + slot.start() + " - " + slot.end() + "<br/>"
+                    + "<b>Interview Location:</b> " + (location != null ? location : "-") + "<br/>"
                     + "<b>Panel:</b> " + (panel != null ? panel.getName() : "-") + "</p>"
                     + "<p>Please be available at the scheduled time.</p>";
             mailService.sendHtmlEmail(candidate.getEmail(), "Interview Scheduled", html);

@@ -3,6 +3,7 @@ package com.sentrifugo.rms.recruiterportal.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -29,6 +30,7 @@ public class CandidateDTO {
     private String name;
 
     @NotBlank(message = "Phone is required")
+    @Pattern(regexp = "^[0-9]{10}$", message = "Phone must be a valid 10-digit number")
     private String phone;
 
     @NotBlank(message = "Email is required")
@@ -46,5 +48,15 @@ public class CandidateDTO {
 
     private String status;
     private BigDecimal finalScore;
+
     private BigDecimal salary;
+
+    // Compensation Management fields (Section 15 of the requirements doc)
+    private BigDecimal currentCtc;
+    private BigDecimal expectedCtc;
+    private BigDecimal fixedPay;
+    private BigDecimal variablePay;
+    private BigDecimal bonus;
+    private String compensationComments;
+    private BigDecimal agreedCtc;
 }

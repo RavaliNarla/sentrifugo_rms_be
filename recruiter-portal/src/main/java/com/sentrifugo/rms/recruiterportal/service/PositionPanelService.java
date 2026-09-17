@@ -1,5 +1,6 @@
 package com.sentrifugo.rms.recruiterportal.service;
 
+import com.sentrifugo.rms.common.exception.CommonException;
 import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
 import com.sentrifugo.rms.db.entity.InterviewPanelEntity;
 import com.sentrifugo.rms.db.entity.PositionPanelEntity;
@@ -23,6 +24,12 @@ public class PositionPanelService {
     private final InterviewPanelRepository interviewPanelRepository;
 
     public PositionPanelDTO assign(PositionPanelDTO dto) {
+        if (dto.getStartDate() != null && dto.getStartDate().isBefore(LocalDate.now())) {
+            throw new CommonException("Start Date cannot be in the past.");
+        }
+        if (dto.getStartDate() != null && dto.getEndDate() != null && dto.getEndDate().isBefore(dto.getStartDate())) {
+            throw new CommonException("End Date must be on or after the Start Date.");
+        }
         PositionPanelEntity entity = PositionPanelEntity.builder()
                 .positionId(dto.getPositionId())
                 .panelId(dto.getPanelId())

@@ -13,4 +13,7 @@ public interface JobPositionRepository extends JpaRepository<JobPositionEntity, 
     List<JobPositionEntity> findByRequisitionId(UUID requisitionId);
     List<JobPositionEntity> findByRequisitionIdIn(List<UUID> requisitionIds);
     List<JobPositionEntity> findByRequisitionIdAndStatus(UUID requisitionId, PositionStatus status);
+
+    boolean existsByRequisitionIdAndDepartmentIdAndLocationIdAndPositionTitleId(
+            UUID requisitionId, UUID departmentId, UUID locationId, UUID positionTitleId);
 }

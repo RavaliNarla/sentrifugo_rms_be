@@ -61,6 +61,30 @@ public class CandidateEntity extends BaseEntity<UUID> {
     @Column(name = "final_score", precision = 5, scale = 2)
     private BigDecimal finalScore;
 
+    /** Legacy single-figure salary - superseded by the CTC breakdown below, kept for backward compatibility. */
     @Column(name = "salary", precision = 12, scale = 2)
     private BigDecimal salary;
+
+    // --- Compensation Management (Section 15 of the requirements doc) ---
+    @Column(name = "current_ctc", precision = 12, scale = 2)
+    private BigDecimal currentCtc;
+
+    @Column(name = "expected_ctc", precision = 12, scale = 2)
+    private BigDecimal expectedCtc;
+
+    @Column(name = "fixed_pay", precision = 12, scale = 2)
+    private BigDecimal fixedPay;
+
+    @Column(name = "variable_pay", precision = 12, scale = 2)
+    private BigDecimal variablePay;
+
+    @Column(name = "bonus", precision = 12, scale = 2)
+    private BigDecimal bonus;
+
+    @Column(name = "compensation_comments", columnDefinition = "TEXT")
+    private String compensationComments;
+
+    /** The final negotiated CTC - this is what flows into the offer letter. */
+    @Column(name = "agreed_ctc", precision = 12, scale = 2)
+    private BigDecimal agreedCtc;
 }

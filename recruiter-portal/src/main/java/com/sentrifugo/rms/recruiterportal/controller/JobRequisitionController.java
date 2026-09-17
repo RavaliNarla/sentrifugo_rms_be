@@ -41,6 +41,13 @@ public class JobRequisitionController {
         return ResponseEntity.ok(ApiResponse.ok(jobRequisitionService.getById(id), "Requisition fetched successfully"));
     }
 
+    @Operation(summary = "Delete a requisition (only while status = NEW)")
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
+        jobRequisitionService.delete(id);
+        return ResponseEntity.ok(ApiResponse.ok("Requisition deleted successfully"));
+    }
+
     @Operation(summary = "List all requisitions (paginated), newest first")
     @GetMapping
     public ResponseEntity<ApiResponse<Page<JobRequisitionDTO>>> getAll(
@@ -86,5 +93,12 @@ public class JobRequisitionController {
     public ResponseEntity<ApiResponse<Void>> markFulfilled(@PathVariable UUID id) {
         jobRequisitionService.markFulfilled(id);
         return ResponseEntity.ok(ApiResponse.ok("Requisition marked as fulfilled"));
+    }
+
+    @Operation(summary = "Undo Mark Fulfilled - reopens the requisition back to APPROVED")
+    @PostMapping("/{id}/unfulfil")
+    public ResponseEntity<ApiResponse<Void>> unmarkFulfilled(@PathVariable UUID id) {
+        jobRequisitionService.unmarkFulfilled(id);
+        return ResponseEntity.ok(ApiResponse.ok("Requisition reopened successfully"));
     }
 }

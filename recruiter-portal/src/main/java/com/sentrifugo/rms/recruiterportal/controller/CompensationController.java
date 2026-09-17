@@ -2,6 +2,7 @@ package com.sentrifugo.rms.recruiterportal.controller;
 
 import com.sentrifugo.rms.common.dto.ApiResponse;
 import com.sentrifugo.rms.recruiterportal.dto.CandidateDTO;
+import com.sentrifugo.rms.recruiterportal.dto.CompensationDetailsRequest;
 import com.sentrifugo.rms.recruiterportal.service.CompensationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -10,11 +11,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
 
-@Tag(name = "Compensation Pool")
+@Tag(name = "Compensation Management")
 @RestController
 @RequestMapping("${recruiter.api.base.path}/compensation-pool")
 @RequiredArgsConstructor
@@ -22,28 +22,28 @@ public class CompensationController {
 
     private final CompensationService compensationService;
 
-    @Operation(summary = "Move QUALIFIED candidates into the Compensation Pool")
+    @Operation(summary = "Move QUALIFIED candidates into Compensation Management")
     @PostMapping("/move-in")
     public ResponseEntity<ApiResponse<Void>> moveIn(@RequestBody List<UUID> candidateIds) {
         compensationService.moveToCompensation(candidateIds);
-        return ResponseEntity.ok(ApiResponse.ok("Candidate(s) moved to Compensation Pool"));
+        return ResponseEntity.ok(ApiResponse.ok("Candidate(s) moved to Compensation Management"));
     }
 
-    @Operation(summary = "Set/update a candidate's salary")
-    @PutMapping("/{candidateId}/salary")
-    public ResponseEntity<ApiResponse<Void>> updateSalary(@PathVariable UUID candidateId, @RequestParam BigDecimal salary) {
-        compensationService.updateSalary(candidateId, salary);
-        return ResponseEntity.ok(ApiResponse.ok("Salary updated successfully"));
+    @Operation(summary = "Set/update a candidate's compensation details (Current/Expected CTC, Fixed/Variable Pay, Bonus, Agreed CTC)")
+    @PutMapping("/{candidateId}/details")
+    public ResponseEntity<ApiResponse<Void>> updateDetails(@PathVariable UUID candidateId, @RequestBody CompensationDetailsRequest request) {
+        compensationService.updateCompensationDetails(candidateId, request);
+        return ResponseEntity.ok(ApiResponse.ok("Compensation details updated successfully"));
     }
 
-    @Operation(summary = "Move candidates (with salary filled) into the Offer Pool")
+    @Operation(summary = "Move candidates (with Agreed CTC filled) into the Offer Pool")
     @PostMapping("/move-to-offer")
     public ResponseEntity<ApiResponse<Void>> moveToOffer(@RequestBody List<UUID> candidateIds) {
         compensationService.moveToOffer(candidateIds);
         return ResponseEntity.ok(ApiResponse.ok("Candidate(s) moved to Offer Pool"));
     }
 
-    @Operation(summary = "List Compensation Pool candidates for a position (server-side paginated)")
+    @Operation(summary = "List Compensation Management candidates for a position (server-side paginated)")
     @GetMapping("/search")
     public ResponseEntity<ApiResponse<Page<CandidateDTO>>> search(
             @RequestParam UUID positionId,
