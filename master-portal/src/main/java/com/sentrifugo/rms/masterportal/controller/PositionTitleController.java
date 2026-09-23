@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,9 +22,13 @@ public class PositionTitleController {
 
     private final PositionTitleService service;
 
+    @Operation(summary = "Paginated + searchable list - drives the Position Titles admin screen")
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<PositionTitleDTO>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.ok(service.getAll(), "Position titles fetched successfully"));
+    public ResponseEntity<ApiResponse<Page<PositionTitleDTO>>> getAll(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(ApiResponse.ok(service.getAll(search, page, size), "Position titles fetched successfully"));
     }
 
     @Operation(summary = "Position titles under a department - drives the Add Position screen's department-filtered dropdown")

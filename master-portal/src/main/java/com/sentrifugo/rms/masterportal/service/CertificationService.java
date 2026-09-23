@@ -6,6 +6,9 @@ import com.sentrifugo.rms.db.entity.CertificationEntity;
 import com.sentrifugo.rms.db.repository.CertificationRepository;
 import com.sentrifugo.rms.masterportal.dto.CertificationDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,8 +21,19 @@ public class CertificationService {
 
     private final CertificationRepository repository;
 
-    public List<CertificationDTO> getAll() {
-        return repository.findAllByOrderByNameAsc().stream().map(this::toDto).collect(Collectors.toList());
+    public List<CertificationDTO> getAll(String search) {
+        List<CertificationEntity> entities = (search == null || search.isBlank())
+                ? repository.findAllByOrderByNameAsc()
+                : repository.findByNameContainingIgnoreCaseOrderByNameAsc(search.trim());
+        return entities.stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    public Page<CertificationDTO> search(String search, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<CertificationEntity> entities = (search == null || search.isBlank())
+                ? repository.findAllByOrderByNameAsc(pageable)
+                : repository.findByNameContainingIgnoreCaseOrderByNameAsc(search.trim(), pageable);
+        return entities.map(this::toDto);
     }
 
     public CertificationDTO add(CertificationDTO dto) {

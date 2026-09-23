@@ -13,6 +13,8 @@ import java.util.UUID;
 public interface SpecializationRepository extends JpaRepository<SpecializationEntity, UUID> {
     List<SpecializationEntity> findAllByOrderByNameAsc();
 
+    List<SpecializationEntity> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
+
     /** Specializations tied to this education level, plus any general (unlinked) ones. */
     @Query("""
         SELECT s FROM SpecializationEntity s

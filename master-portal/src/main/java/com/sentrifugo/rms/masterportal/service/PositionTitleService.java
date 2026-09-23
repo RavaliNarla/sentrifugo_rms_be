@@ -7,6 +7,9 @@ import com.sentrifugo.rms.db.repository.DepartmentRepository;
 import com.sentrifugo.rms.db.repository.PositionTitleRepository;
 import com.sentrifugo.rms.masterportal.dto.PositionTitleDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,8 +23,12 @@ public class PositionTitleService {
     private final PositionTitleRepository repository;
     private final DepartmentRepository departmentRepository;
 
-    public List<PositionTitleDTO> getAll() {
-        return repository.findAllByOrderByNameAsc().stream().map(this::toDto).collect(Collectors.toList());
+    public Page<PositionTitleDTO> getAll(String search, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<PositionTitleEntity> entities = (search == null || search.isBlank())
+                ? repository.findAllByOrderByNameAsc(pageable)
+                : repository.search(search.trim(), pageable);
+        return entities.map(this::toDto);
     }
 
     public List<PositionTitleDTO> getByDepartment(UUID departmentId) {

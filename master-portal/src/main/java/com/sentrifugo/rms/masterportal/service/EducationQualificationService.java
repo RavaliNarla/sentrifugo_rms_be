@@ -5,6 +5,9 @@ import com.sentrifugo.rms.db.entity.EducationQualificationEntity;
 import com.sentrifugo.rms.db.repository.EducationQualificationRepository;
 import com.sentrifugo.rms.masterportal.dto.NamedMasterDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -17,10 +20,21 @@ public class EducationQualificationService {
 
     private final EducationQualificationRepository repository;
 
-    public List<NamedMasterDTO> getAll() {
-        return repository.findAllByOrderByNameAsc().stream()
+    public List<NamedMasterDTO> getAll(String search) {
+        List<EducationQualificationEntity> entities = (search == null || search.isBlank())
+                ? repository.findAllByOrderByNameAsc()
+                : repository.findByNameContainingIgnoreCaseOrderByNameAsc(search.trim());
+        return entities.stream()
                 .map(e -> NamedMasterDTO.builder().id(e.getId()).name(e.getName()).build())
                 .collect(Collectors.toList());
+    }
+
+    public Page<NamedMasterDTO> search(String search, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<EducationQualificationEntity> entities = (search == null || search.isBlank())
+                ? repository.findAllByOrderByNameAsc(pageable)
+                : repository.findByNameContainingIgnoreCaseOrderByNameAsc(search.trim(), pageable);
+        return entities.map(e -> NamedMasterDTO.builder().id(e.getId()).name(e.getName()).build());
     }
 
     public NamedMasterDTO add(NamedMasterDTO dto) {

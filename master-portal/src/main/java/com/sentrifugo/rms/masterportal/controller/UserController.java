@@ -25,8 +25,8 @@ public class UserController {
 
     @Operation(summary = "List all users")
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<UserDTO>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.ok(userService.getAll(), "Users fetched successfully"));
+    public ResponseEntity<ApiResponse<List<UserDTO>>> getAll(@RequestParam(required = false) String search) {
+        return ResponseEntity.ok(ApiResponse.ok(userService.getAll(search), "Users fetched successfully"));
     }
 
     @Operation(summary = "Add a user (email must match their Azure AD account to allow login)")

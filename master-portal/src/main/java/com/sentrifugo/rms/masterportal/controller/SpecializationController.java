@@ -22,8 +22,8 @@ public class SpecializationController {
     private final SpecializationService service;
 
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<SpecializationDTO>>> getAll() {
-        return ResponseEntity.ok(ApiResponse.ok(service.getAll(), "Specializations fetched successfully"));
+    public ResponseEntity<ApiResponse<List<SpecializationDTO>>> getAll(@RequestParam(required = false) String search) {
+        return ResponseEntity.ok(ApiResponse.ok(service.getAll(search), "Specializations fetched successfully"));
     }
 
     @Operation(summary = "Specializations for an education level (plus general/unlinked ones) - drives the optional Specialization dropdown on Add Position")

@@ -6,6 +6,9 @@ import com.sentrifugo.rms.db.entity.DepartmentEntity;
 import com.sentrifugo.rms.db.repository.DepartmentRepository;
 import com.sentrifugo.rms.masterportal.dto.NamedMasterDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,10 +21,21 @@ public class DepartmentService {
 
     private final DepartmentRepository departmentRepository;
 
-    public List<NamedMasterDTO> getAll() {
-        return departmentRepository.findAllByOrderByNameAsc().stream()
+    public List<NamedMasterDTO> getAll(String search) {
+        List<DepartmentEntity> entities = (search == null || search.isBlank())
+                ? departmentRepository.findAllByOrderByNameAsc()
+                : departmentRepository.findByNameContainingIgnoreCaseOrderByNameAsc(search.trim());
+        return entities.stream()
                 .map(e -> NamedMasterDTO.builder().id(e.getId()).name(e.getName()).build())
                 .collect(Collectors.toList());
+    }
+
+    public Page<NamedMasterDTO> search(String search, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<DepartmentEntity> entities = (search == null || search.isBlank())
+                ? departmentRepository.findAllByOrderByNameAsc(pageable)
+                : departmentRepository.findByNameContainingIgnoreCaseOrderByNameAsc(search.trim(), pageable);
+        return entities.map(e -> NamedMasterDTO.builder().id(e.getId()).name(e.getName()).build());
     }
 
     public NamedMasterDTO add(NamedMasterDTO dto) {

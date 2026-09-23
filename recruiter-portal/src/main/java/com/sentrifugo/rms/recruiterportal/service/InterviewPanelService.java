@@ -14,8 +14,10 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -33,6 +35,7 @@ public class InterviewPanelService {
         if (interviewPanelRepository.existsByNameIgnoreCase(dto.getName())) {
             throw new CommonException("A panel with this name already exists.");
         }
+        rejectIfDuplicateMemberSet(dto.getMemberIds(), null);
         InterviewPanelEntity panel = interviewPanelRepository.save(InterviewPanelEntity.builder().name(dto.getName()).build());
         saveMembers(panel.getId(), dto.getMemberIds());
         return toDto(panel);
@@ -42,11 +45,42 @@ public class InterviewPanelService {
     public InterviewPanelDTO update(UUID id, InterviewPanelDTO dto) {
         InterviewPanelEntity panel = interviewPanelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Panel not found"));
+        rejectIfDuplicateMemberSet(dto.getMemberIds(), id);
         panel.setName(dto.getName());
         interviewPanelRepository.save(panel);
         interviewPanelMemberRepository.deleteByPanelId(id);
         saveMembers(id, dto.getMemberIds());
         return toDto(panel);
+    }
+
+    // SCL: block creating/renaming a panel to have the exact same member set as an existing
+    // panel (order-independent) - the recruiter should reuse the existing panel instead.
+    private void rejectIfDuplicateMemberSet(List<UUID> memberIds, UUID excludePanelId) {
+        Set<UUID> incoming = new HashSet<>(memberIds);
+        List<InterviewPanelEntity> allPanels = interviewPanelRepository.findAll();
+        List<UUID> candidateIds = allPanels.stream()
+                .map(InterviewPanelEntity::getId)
+                .filter(pid -> excludePanelId == null || !pid.equals(excludePanelId))
+                .collect(Collectors.toList());
+        if (candidateIds.isEmpty()) {
+            return;
+        }
+        Map<UUID, Set<UUID>> membersByPanel = interviewPanelMemberRepository.findByPanelIdIn(candidateIds).stream()
+                .collect(Collectors.groupingBy(
+                        InterviewPanelMemberEntity::getPanelId,
+                        Collectors.mapping(InterviewPanelMemberEntity::getUserId, Collectors.toSet())
+                ));
+        for (InterviewPanelEntity candidate : allPanels) {
+            if (excludePanelId != null && candidate.getId().equals(excludePanelId)) {
+                continue;
+            }
+            Set<UUID> existingMembers = membersByPanel.getOrDefault(candidate.getId(), Set.of());
+            if (existingMembers.equals(incoming)) {
+                throw new CommonException(
+                        "A panel with these exact members already exists: \"" + candidate.getName() + "\". Use the existing panel instead."
+                );
+            }
+        }
     }
 
     @Transactional

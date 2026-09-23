@@ -20,8 +20,11 @@ public class SpecializationService {
     private final SpecializationRepository repository;
     private final EducationQualificationRepository educationQualificationRepository;
 
-    public List<SpecializationDTO> getAll() {
-        return repository.findAllByOrderByNameAsc().stream().map(this::toDto).collect(Collectors.toList());
+    public List<SpecializationDTO> getAll(String search) {
+        List<SpecializationEntity> entities = (search == null || search.isBlank())
+                ? repository.findAllByOrderByNameAsc()
+                : repository.findByNameContainingIgnoreCaseOrderByNameAsc(search.trim());
+        return entities.stream().map(this::toDto).collect(Collectors.toList());
     }
 
     public List<SpecializationDTO> getByEducation(UUID educationQualificationId) {

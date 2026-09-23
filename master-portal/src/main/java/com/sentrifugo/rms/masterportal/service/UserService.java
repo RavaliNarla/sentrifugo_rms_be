@@ -18,8 +18,11 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    public List<UserDTO> getAll() {
-        return userRepository.findAllByOrderByNameAsc().stream()
+    public List<UserDTO> getAll(String search) {
+        List<UserEntity> entities = (search == null || search.isBlank())
+                ? userRepository.findAllByOrderByNameAsc()
+                : userRepository.search(search.trim());
+        return entities.stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }

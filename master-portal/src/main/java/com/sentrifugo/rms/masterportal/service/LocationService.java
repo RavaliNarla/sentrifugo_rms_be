@@ -7,6 +7,9 @@ import com.sentrifugo.rms.db.repository.LocationRepository;
 import com.sentrifugo.rms.db.repository.StateRepository;
 import com.sentrifugo.rms.masterportal.dto.LocationDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -21,12 +24,25 @@ public class LocationService {
     private final LocationRepository locationRepository;
     private final StateRepository stateRepository;
 
-    public List<LocationDTO> getAll() {
+    public List<LocationDTO> getAll(String search) {
         Map<UUID, String> stateNames = stateRepository.findAll().stream()
                 .collect(Collectors.toMap(StateEntity::getId, StateEntity::getName));
-        return locationRepository.findAllByOrderByNameAsc().stream()
+        List<LocationEntity> entities = (search == null || search.isBlank())
+                ? locationRepository.findAllByOrderByNameAsc()
+                : locationRepository.search(search.trim());
+        return entities.stream()
                 .map(e -> toDto(e, stateNames.get(e.getStateId())))
                 .collect(Collectors.toList());
+    }
+
+    public Page<LocationDTO> search(String search, int page, int size) {
+        Map<UUID, String> stateNames = stateRepository.findAll().stream()
+                .collect(Collectors.toMap(StateEntity::getId, StateEntity::getName));
+        Pageable pageable = PageRequest.of(page, size);
+        Page<LocationEntity> entities = (search == null || search.isBlank())
+                ? locationRepository.findAllByOrderByNameAsc(pageable)
+                : locationRepository.search(search.trim(), pageable);
+        return entities.map(e -> toDto(e, stateNames.get(e.getStateId())));
     }
 
     public LocationDTO add(LocationDTO dto) {
