@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -23,10 +24,13 @@ public class UserController {
 
     private final UserService userService;
 
-    @Operation(summary = "List all users")
+    @Operation(summary = "Paginated + searchable list - drives the Users admin screen")
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<UserDTO>>> getAll(@RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponse.ok(userService.getAll(search), "Users fetched successfully"));
+    public ResponseEntity<ApiResponse<Page<UserDTO>>> getAll(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(ApiResponse.ok(userService.getAll(search, page, size), "Users fetched successfully"));
     }
 
     @Operation(summary = "Add a user (email must match their Azure AD account to allow login)")

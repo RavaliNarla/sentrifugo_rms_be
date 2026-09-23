@@ -1,6 +1,8 @@
 package com.sentrifugo.rms.db.repository;
 
 import com.sentrifugo.rms.db.entity.SpecializationEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -11,9 +13,11 @@ import java.util.UUID;
 
 @Repository
 public interface SpecializationRepository extends JpaRepository<SpecializationEntity, UUID> {
-    List<SpecializationEntity> findAllByOrderByNameAsc();
+    // Paginated - drives the Specializations admin screen (the only consumer of "all
+    // specializations"; the education-scoped method below feeds the Add Position dropdown).
+    Page<SpecializationEntity> findAllByOrderByNameAsc(Pageable pageable);
 
-    List<SpecializationEntity> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
+    Page<SpecializationEntity> findByNameContainingIgnoreCaseOrderByNameAsc(String name, Pageable pageable);
 
     /** Specializations tied to this education level, plus any general (unlinked) ones. */
     @Query("""

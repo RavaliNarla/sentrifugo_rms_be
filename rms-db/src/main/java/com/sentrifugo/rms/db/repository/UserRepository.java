@@ -1,6 +1,8 @@
 package com.sentrifugo.rms.db.repository;
 
 import com.sentrifugo.rms.db.entity.UserEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -14,7 +16,9 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     Optional<UserEntity> findByEmailIgnoreCase(String email);
     List<UserEntity> findByRoleIn(List<String> roles);
-    List<UserEntity> findAllByOrderByNameAsc();
+
+    // Paginated - drives the Users admin screen.
+    Page<UserEntity> findAllByOrderByNameAsc(Pageable pageable);
 
     @Query("""
         SELECT u FROM UserEntity u
@@ -23,5 +27,5 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
            OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))
         ORDER BY u.name ASC
         """)
-    List<UserEntity> search(@Param("search") String search);
+    Page<UserEntity> search(@Param("search") String search, Pageable pageable);
 }

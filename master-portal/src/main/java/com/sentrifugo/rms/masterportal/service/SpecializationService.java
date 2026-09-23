@@ -7,6 +7,9 @@ import com.sentrifugo.rms.db.repository.EducationQualificationRepository;
 import com.sentrifugo.rms.db.repository.SpecializationRepository;
 import com.sentrifugo.rms.masterportal.dto.SpecializationDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -20,11 +23,12 @@ public class SpecializationService {
     private final SpecializationRepository repository;
     private final EducationQualificationRepository educationQualificationRepository;
 
-    public List<SpecializationDTO> getAll(String search) {
-        List<SpecializationEntity> entities = (search == null || search.isBlank())
-                ? repository.findAllByOrderByNameAsc()
-                : repository.findByNameContainingIgnoreCaseOrderByNameAsc(search.trim());
-        return entities.stream().map(this::toDto).collect(Collectors.toList());
+    public Page<SpecializationDTO> getAll(String search, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<SpecializationEntity> entities = (search == null || search.isBlank())
+                ? repository.findAllByOrderByNameAsc(pageable)
+                : repository.findByNameContainingIgnoreCaseOrderByNameAsc(search.trim(), pageable);
+        return entities.map(this::toDto);
     }
 
     public List<SpecializationDTO> getByEducation(UUID educationQualificationId) {

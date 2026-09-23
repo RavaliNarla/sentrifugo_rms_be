@@ -6,6 +6,9 @@ import com.sentrifugo.rms.db.entity.UserEntity;
 import com.sentrifugo.rms.db.repository.UserRepository;
 import com.sentrifugo.rms.masterportal.dto.UserDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -18,13 +21,12 @@ public class UserService {
 
     private final UserRepository userRepository;
 
-    public List<UserDTO> getAll(String search) {
-        List<UserEntity> entities = (search == null || search.isBlank())
-                ? userRepository.findAllByOrderByNameAsc()
-                : userRepository.search(search.trim());
-        return entities.stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
+    public Page<UserDTO> getAll(String search, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<UserEntity> entities = (search == null || search.isBlank())
+                ? userRepository.findAllByOrderByNameAsc(pageable)
+                : userRepository.search(search.trim(), pageable);
+        return entities.map(this::toDto);
     }
 
     public UserDTO add(UserDTO dto) {

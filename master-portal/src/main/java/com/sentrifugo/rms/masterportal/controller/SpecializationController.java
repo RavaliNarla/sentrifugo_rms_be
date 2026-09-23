@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -21,9 +22,13 @@ public class SpecializationController {
 
     private final SpecializationService service;
 
+    @Operation(summary = "Paginated + searchable list - drives the Specializations admin screen")
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<SpecializationDTO>>> getAll(@RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponse.ok(service.getAll(search), "Specializations fetched successfully"));
+    public ResponseEntity<ApiResponse<Page<SpecializationDTO>>> getAll(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(ApiResponse.ok(service.getAll(search, page, size), "Specializations fetched successfully"));
     }
 
     @Operation(summary = "Specializations for an education level (plus general/unlinked ones) - drives the optional Specialization dropdown on Add Position")
