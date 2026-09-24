@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -40,9 +41,18 @@ public class InterviewPanelController {
         return ResponseEntity.ok(ApiResponse.ok("Panel deleted successfully"));
     }
 
-    @Operation(summary = "List all panels")
+    @Operation(summary = "List all panels - used to populate dropdowns elsewhere")
     @GetMapping("/all")
     public ResponseEntity<ApiResponse<List<InterviewPanelDTO>>> getAll() {
         return ResponseEntity.ok(ApiResponse.ok(interviewPanelService.getAll(), "Panels fetched successfully"));
+    }
+
+    @Operation(summary = "Paginated + searchable list - drives the Manage Panels admin screen")
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<Page<InterviewPanelDTO>>> search(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        return ResponseEntity.ok(ApiResponse.ok(interviewPanelService.search(search, page, size), "Panels fetched successfully"));
     }
 }

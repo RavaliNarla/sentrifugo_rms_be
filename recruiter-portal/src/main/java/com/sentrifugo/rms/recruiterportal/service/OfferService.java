@@ -14,10 +14,14 @@ import com.sentrifugo.rms.db.repository.*;
 import com.sentrifugo.rms.recruiterportal.dto.CandidateOfferDTO;
 import com.sentrifugo.rms.recruiterportal.dto.GenerateOfferRequest;
 import com.sentrifugo.rms.recruiterportal.dto.OfferApprovalActionRequest;
+import com.sentrifugo.rms.recruiterportal.dto.OfferApprovalHistoryDTO;
 import com.sentrifugo.rms.recruiterportal.dto.OfferPreviewRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.context.Context;
@@ -49,6 +53,7 @@ public class OfferService {
     private final LocationRepository locationRepository;
     private final OfferTemplateRepository offerTemplateRepository;
     private final CandidateOfferRepository candidateOfferRepository;
+    private final OfferApprovalHistoryRepository offerApprovalHistoryRepository;
     private final RequisitionApproverRepository requisitionApproverRepository;
     private final UserRepository userRepository;
     private final SpringTemplateEngine templateEngine;
@@ -65,6 +70,14 @@ public class OfferService {
 
     /** SCL_41: only accepted/rejected offers are locked; everything else can be regenerated and resent. */
     private static final List<OfferStatus> TERMINAL = List.of(OfferStatus.ACCEPTED, OfferStatus.REJECTED);
+
+    // Offer Approvals screen: statuses visible to each level, mirroring the Requisition Approvals
+    // screen (getForL1Approval/getForL2Approval) - decided requests stay visible with their final
+    // status instead of disappearing from the list once acted on.
+    private static final List<OfferStatus> L1_VISIBLE_STATUSES = List.of(
+            OfferStatus.L1_PENDING, OfferStatus.L2_PENDING, OfferStatus.SENT, OfferStatus.L1_REJECTED, OfferStatus.L2_REJECTED);
+    private static final List<OfferStatus> L2_VISIBLE_STATUSES = List.of(
+            OfferStatus.L2_PENDING, OfferStatus.SENT, OfferStatus.L2_REJECTED);
 
     @Transactional
     public List<CandidateOfferDTO> generateOffers(GenerateOfferRequest request) {
@@ -143,12 +156,16 @@ public class OfferService {
 
     @Transactional
     public void submitForApproval(List<UUID> candidateIds) {
+        UUID currentUserId = securityUtils.getCurrentUserId();
+        String actorName = resolveUserName(currentUserId);
+
         List<CandidateOfferEntity> offers = candidateOfferRepository.findByCandidateIdIn(candidateIds);
         for (CandidateOfferEntity offer : offers) {
             if (offer.getStatus() != OfferStatus.GENERATED) {
                 throw new CommonException("Offer is not in a state that can be submitted for approval.");
             }
             offer.setStatus(OfferStatus.L1_PENDING);
+            recordHistory(offer.getId(), currentUserId, actorName, OfferStatus.L1_PENDING.name(), null);
         }
         candidateOfferRepository.saveAll(offers);
         notifyApprover(ApproverRole.L1, "Offer letter(s) submitted for your L1 approval.");
@@ -159,6 +176,7 @@ public class OfferService {
         UUID currentUserId = securityUtils.getCurrentUserId();
         RequisitionApproverEntity approver = requisitionApproverRepository.findByApproverId(currentUserId)
                 .orElseThrow(() -> new CommonException("You are not configured as an L1/L2 approver."));
+        String actorName = resolveUserName(currentUserId);
 
         List<CandidateOfferEntity> offers = candidateOfferRepository.findByCandidateIdIn(request.getCandidateIds());
         boolean anyL1Approved = false;
@@ -181,12 +199,46 @@ public class OfferService {
                 }
             }
             offer.setApprovalComments(request.getComments());
+            recordHistory(offer.getId(), currentUserId, actorName, offer.getStatus().name(), request.getComments());
         }
         candidateOfferRepository.saveAll(offers);
 
         if (approver.getApproverRole() == ApproverRole.L1 && anyL1Approved) {
             notifyApprover(ApproverRole.L2, "Offer letter(s) approved by L1, awaiting your L2 approval.");
         }
+    }
+
+    /** Approval history for the Offer Approvals history modal. */
+    public List<OfferApprovalHistoryDTO> getApprovalHistory(UUID offerId) {
+        if (!candidateOfferRepository.existsById(offerId)) {
+            throw new ResourceNotFoundException("Offer not found");
+        }
+        return offerApprovalHistoryRepository.findByOfferIdOrderByCreatedDateDesc(offerId).stream()
+                .map(h -> OfferApprovalHistoryDTO.builder()
+                        .id(h.getId())
+                        .approverName(h.getApproverName())
+                        .approvalDate(h.getCreatedDate())
+                        .status(h.getStatus())
+                        .comments(h.getComments())
+                        .build())
+                .collect(Collectors.toList());
+    }
+
+    private void recordHistory(UUID offerId, UUID actorId, String actorName, String status, String comments) {
+        offerApprovalHistoryRepository.save(OfferApprovalHistoryEntity.builder()
+                .offerId(offerId)
+                .approverId(actorId)
+                .approverName(actorName)
+                .status(status)
+                .comments(comments)
+                .build());
+    }
+
+    private String resolveUserName(UUID userId) {
+        if (userId == null) {
+            return "Unknown";
+        }
+        return userRepository.findById(userId).map(UserEntity::getName).orElse("Unknown");
     }
 
     /** Candidate-facing send: after L2 approval. Rotates accept token so prior email links stop working. */
@@ -220,16 +272,17 @@ public class OfferService {
         }
     }
 
-    public List<CandidateOfferDTO> getPendingApprovals() {
+    /** Drives the Offer Approvals screen: server-side candidate-name search/status-filter/pagination, newest first. */
+    public Page<CandidateOfferDTO> searchPendingApprovals(String search, OfferStatus status, int page, int size) {
         UUID currentUserId = securityUtils.getCurrentUserId();
         RequisitionApproverEntity approver = requisitionApproverRepository.findByApproverId(currentUserId).orElse(null);
         if (approver == null) {
-            return List.of();
+            return Page.empty();
         }
-        OfferStatus status = approver.getApproverRole() == ApproverRole.L1 ? OfferStatus.L1_PENDING : OfferStatus.L2_PENDING;
-        return candidateOfferRepository.findByStatus(status).stream()
-                .map(offer -> toDto(offer, candidateRepository.findById(offer.getCandidateId()).orElse(null)))
-                .collect(Collectors.toList());
+        List<OfferStatus> allowedStatuses = approver.getApproverRole() == ApproverRole.L1 ? L1_VISIBLE_STATUSES : L2_VISIBLE_STATUSES;
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate"));
+        return candidateOfferRepository.searchForApproval(allowedStatuses, status, search, pageRequest)
+                .map(offer -> toDto(offer, candidateRepository.findById(offer.getCandidateId()).orElse(null)));
     }
 
     public CandidateOfferDTO getByCandidateId(UUID candidateId) {

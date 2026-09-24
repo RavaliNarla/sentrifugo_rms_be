@@ -11,6 +11,9 @@ import com.sentrifugo.rms.db.repository.InterviewScheduleRepository;
 import com.sentrifugo.rms.db.repository.UserRepository;
 import com.sentrifugo.rms.recruiterportal.dto.InterviewPanelDTO;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -95,6 +98,12 @@ public class InterviewPanelService {
     public List<InterviewPanelDTO> getAll() {
         List<InterviewPanelEntity> panels = interviewPanelRepository.findAllByOrderByNameAsc();
         return panels.stream().map(this::toDto).collect(Collectors.toList());
+    }
+
+    /** Drives the Manage Panels admin screen: server-side search + pagination, name ascending. */
+    public Page<InterviewPanelDTO> search(String search, int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name"));
+        return interviewPanelRepository.search(search, pageRequest).map(this::toDto);
     }
 
     private void saveMembers(UUID panelId, List<UUID> memberIds) {

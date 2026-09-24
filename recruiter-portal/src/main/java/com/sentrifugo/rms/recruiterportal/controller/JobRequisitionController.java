@@ -1,8 +1,10 @@
 package com.sentrifugo.rms.recruiterportal.controller;
 
 import com.sentrifugo.rms.common.dto.ApiResponse;
+import com.sentrifugo.rms.db.enums.RequisitionStatus;
 import com.sentrifugo.rms.recruiterportal.dto.ApprovalActionRequest;
 import com.sentrifugo.rms.recruiterportal.dto.JobRequisitionDTO;
+import com.sentrifugo.rms.recruiterportal.dto.RequisitionFilterOptionsDTO;
 import com.sentrifugo.rms.recruiterportal.service.JobRequisitionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -56,22 +58,59 @@ public class JobRequisitionController {
         return ResponseEntity.ok(ApiResponse.ok(jobRequisitionService.getAll(page, size), "Requisitions fetched successfully"));
     }
 
+    @Operation(summary = "Search/filter requisitions for the Job Postings screen (server-side paginated), newest first")
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<Page<JobRequisitionDTO>>> search(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Integer yearFrom,
+            @RequestParam(required = false) Integer yearTo,
+            @RequestParam(required = false) Integer month,
+            @RequestParam(required = false) String jobTitle,
+            @RequestParam(required = false) String department,
+            @RequestParam(required = false) String location,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        RequisitionStatus statusEnum = (status == null || status.isBlank()) ? null : RequisitionStatus.valueOf(status);
+        return ResponseEntity.ok(ApiResponse.ok(
+                jobRequisitionService.search(search, statusEnum, yearFrom, yearTo, month, jobTitle, department, location, page, size),
+                "Requisitions fetched successfully"));
+    }
+
+    @Operation(summary = "Distinct filter values (years/job titles/departments/locations) for the Job Postings filter dropdowns")
+    @GetMapping("/filter-options")
+    public ResponseEntity<ApiResponse<RequisitionFilterOptionsDTO>> filterOptions() {
+        return ResponseEntity.ok(ApiResponse.ok(jobRequisitionService.getFilterOptions(), "Filter options fetched successfully"));
+    }
+
     @Operation(summary = "List APPROVED requisitions - for the Candidate Workflow dropdown")
     @GetMapping("/approved")
     public ResponseEntity<ApiResponse<List<JobRequisitionDTO>>> getApproved() {
         return ResponseEntity.ok(ApiResponse.ok(jobRequisitionService.getApprovedForDropdown(), "Approved requisitions fetched successfully"));
     }
 
-    @Operation(summary = "L1 approval queue")
+    @Operation(summary = "L1 approval queue (server-side search/status-filter, paginated)")
     @GetMapping("/l1-requisitions")
-    public ResponseEntity<ApiResponse<List<JobRequisitionDTO>>> getForL1() {
-        return ResponseEntity.ok(ApiResponse.ok(jobRequisitionService.getForL1Approval(), "L1 requisitions fetched successfully"));
+    public ResponseEntity<ApiResponse<Page<JobRequisitionDTO>>> getForL1(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        RequisitionStatus statusEnum = (status == null || status.isBlank()) ? null : RequisitionStatus.valueOf(status);
+        return ResponseEntity.ok(ApiResponse.ok(
+                jobRequisitionService.searchForApproval(false, search, statusEnum, page, size), "L1 requisitions fetched successfully"));
     }
 
-    @Operation(summary = "L2 approval queue")
+    @Operation(summary = "L2 approval queue (server-side search/status-filter, paginated)")
     @GetMapping("/l2-requisitions")
-    public ResponseEntity<ApiResponse<List<JobRequisitionDTO>>> getForL2() {
-        return ResponseEntity.ok(ApiResponse.ok(jobRequisitionService.getForL2Approval(), "L2 requisitions fetched successfully"));
+    public ResponseEntity<ApiResponse<Page<JobRequisitionDTO>>> getForL2(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        RequisitionStatus statusEnum = (status == null || status.isBlank()) ? null : RequisitionStatus.valueOf(status);
+        return ResponseEntity.ok(ApiResponse.ok(
+                jobRequisitionService.searchForApproval(true, search, statusEnum, page, size), "L2 requisitions fetched successfully"));
     }
 
     @Operation(summary = "Submit one or more requisitions for L1 approval")

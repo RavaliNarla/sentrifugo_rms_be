@@ -18,10 +18,12 @@ import com.sentrifugo.rms.db.repository.UserRepository;
 import com.sentrifugo.rms.recruiterportal.dto.ApprovalActionRequest;
 import com.sentrifugo.rms.recruiterportal.dto.JobRequisitionDTO;
 import com.sentrifugo.rms.recruiterportal.dto.RequisitionApprovalHistoryDTO;
+import com.sentrifugo.rms.recruiterportal.dto.RequisitionFilterOptionsDTO;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -112,23 +114,44 @@ public class JobRequisitionService {
                 .map(this::toDto);
     }
 
+    /** Drives the Job Postings screen: server-side search/filter/sort/pagination, newest first. */
+    public Page<JobRequisitionDTO> search(String search, RequisitionStatus status, Integer yearFrom, Integer yearTo,
+                                           Integer month, String jobTitle, String department, String location,
+                                           int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate"));
+        return jobRequisitionRepository.search(search, status, yearFrom, yearTo, month, jobTitle, department, location, pageRequest)
+                .map(this::toDto);
+    }
+
+    /** Distinct values (across all requisitions/positions) for the Job Postings filter dropdowns. */
+    public RequisitionFilterOptionsDTO getFilterOptions() {
+        return RequisitionFilterOptionsDTO.builder()
+                .years(jobRequisitionRepository.findDistinctStartYears())
+                .jobTitles(jobPositionRepository.findDistinctPositionTitleNames())
+                .departments(jobPositionRepository.findDistinctDepartmentNames())
+                .locations(jobPositionRepository.findDistinctLocationNames())
+                .build();
+    }
+
     public List<JobRequisitionDTO> getApprovedForDropdown() {
         return jobRequisitionRepository.findApprovedForDropdown(RequisitionStatus.APPROVED).stream()
                 .map(this::toDto)
                 .collect(Collectors.toList());
     }
 
-    public List<JobRequisitionDTO> getForL1Approval() {
-        return jobRequisitionRepository.findByStatusIn(List.of(
-                RequisitionStatus.L1_PENDING, RequisitionStatus.L2_PENDING,
-                RequisitionStatus.APPROVED, RequisitionStatus.L1_REJECTED, RequisitionStatus.L2_REJECTED
-        )).stream().map(this::toDto).collect(Collectors.toList());
-    }
+    // Statuses visible at each approval level - decided requisitions stay visible with their final
+    // status (mirrors Job Postings), not just ones still awaiting this approver's action.
+    private static final List<RequisitionStatus> L1_VISIBLE_STATUSES = List.of(
+            RequisitionStatus.L1_PENDING, RequisitionStatus.L2_PENDING,
+            RequisitionStatus.APPROVED, RequisitionStatus.L1_REJECTED, RequisitionStatus.L2_REJECTED);
+    private static final List<RequisitionStatus> L2_VISIBLE_STATUSES = List.of(
+            RequisitionStatus.L2_PENDING, RequisitionStatus.APPROVED, RequisitionStatus.L2_REJECTED);
 
-    public List<JobRequisitionDTO> getForL2Approval() {
-        return jobRequisitionRepository.findByStatusIn(List.of(
-                RequisitionStatus.L2_PENDING, RequisitionStatus.APPROVED, RequisitionStatus.L2_REJECTED
-        )).stream().map(this::toDto).collect(Collectors.toList());
+    /** Drives the Requisition Approvals screen: server-side search/status-filter/pagination, newest first. */
+    public Page<JobRequisitionDTO> searchForApproval(boolean isL2, String search, RequisitionStatus status, int page, int size) {
+        List<RequisitionStatus> allowedStatuses = isL2 ? L2_VISIBLE_STATUSES : L1_VISIBLE_STATUSES;
+        PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate"));
+        return jobRequisitionRepository.searchForApproval(allowedStatuses, status, search, pageRequest).map(this::toDto);
     }
 
     /** SCL_53: chronological approval trail for the Job Postings history modal. */

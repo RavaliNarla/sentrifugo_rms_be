@@ -1,15 +1,18 @@
 package com.sentrifugo.rms.recruiterportal.controller;
 
 import com.sentrifugo.rms.common.dto.ApiResponse;
+import com.sentrifugo.rms.db.enums.OfferStatus;
 import com.sentrifugo.rms.recruiterportal.dto.CandidateOfferDTO;
 import com.sentrifugo.rms.recruiterportal.dto.GenerateOfferRequest;
 import com.sentrifugo.rms.recruiterportal.dto.OfferApprovalActionRequest;
+import com.sentrifugo.rms.recruiterportal.dto.OfferApprovalHistoryDTO;
 import com.sentrifugo.rms.recruiterportal.dto.OfferPreviewRequest;
 import com.sentrifugo.rms.recruiterportal.service.OfferService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -50,15 +53,27 @@ public class OfferController {
         return ResponseEntity.ok(ApiResponse.ok(request.isApprove() ? "Offer(s) approved" : "Offer(s) rejected"));
     }
 
-    @Operation(summary = "List offers pending the current user's L1/L2 approval - for the Admin > Offer Approvals screen")
+    @Operation(summary = "Offer approval queue for the current user's L1/L2 level (server-side candidate-name search/status-filter, paginated) - for the Offer Approvals screen")
     @GetMapping("/pending-approval")
-    public ResponseEntity<ApiResponse<List<CandidateOfferDTO>>> getPendingApprovals() {
-        return ResponseEntity.ok(ApiResponse.ok(offerService.getPendingApprovals(), "Pending offer approvals fetched successfully"));
+    public ResponseEntity<ApiResponse<Page<CandidateOfferDTO>>> getPendingApprovals(
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false) String status,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        OfferStatus statusEnum = (status == null || status.isBlank()) ? null : OfferStatus.valueOf(status);
+        return ResponseEntity.ok(ApiResponse.ok(
+                offerService.searchPendingApprovals(search, statusEnum, page, size), "Pending offer approvals fetched successfully"));
     }
 
     @Operation(summary = "Get the offer for a candidate (to show the doc icon + preview)")
     @GetMapping("/by-candidate/{candidateId}")
     public ResponseEntity<ApiResponse<CandidateOfferDTO>> getByCandidate(@PathVariable UUID candidateId) {
         return ResponseEntity.ok(ApiResponse.ok(offerService.getByCandidateId(candidateId), "Offer fetched successfully"));
+    }
+
+    @Operation(summary = "Approval history for an offer (for the Offer Approvals history modal)")
+    @GetMapping("/{id}/approval-history")
+    public ResponseEntity<ApiResponse<List<OfferApprovalHistoryDTO>>> getApprovalHistory(@PathVariable UUID id) {
+        return ResponseEntity.ok(ApiResponse.ok(offerService.getApprovalHistory(id), "Approval history fetched successfully"));
     }
 }
