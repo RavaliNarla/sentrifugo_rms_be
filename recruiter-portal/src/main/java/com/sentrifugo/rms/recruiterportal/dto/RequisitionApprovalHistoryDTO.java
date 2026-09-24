@@ -5,7 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Data
@@ -15,7 +15,7 @@ import java.util.UUID;
 public class RequisitionApprovalHistoryDTO {
     private UUID id;
     private String approverName;
-    private LocalDateTime approvalDate;
+    private Instant approvalDate;
     private String status;
     private String comments;
 }

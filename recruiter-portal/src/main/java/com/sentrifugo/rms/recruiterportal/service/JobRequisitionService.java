@@ -27,6 +27,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -163,7 +164,7 @@ public class JobRequisitionService {
                 .map(h -> RequisitionApprovalHistoryDTO.builder()
                         .id(h.getId())
                         .approverName(h.getApproverName())
-                        .approvalDate(h.getCreatedDate())
+                        .approvalDate(h.getOccurredAt())
                         .status(h.getStatus())
                         .comments(h.getComments())
                         .build())
@@ -259,6 +260,7 @@ public class JobRequisitionService {
                 .approverName(actorName)
                 .status(status)
                 .comments(comments)
+                .occurredAt(Instant.now())
                 .build());
     }
 

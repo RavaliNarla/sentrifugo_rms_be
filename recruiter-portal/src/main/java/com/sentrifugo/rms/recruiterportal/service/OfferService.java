@@ -27,6 +27,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.thymeleaf.context.Context;
 import org.thymeleaf.spring6.SpringTemplateEngine;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -226,7 +227,7 @@ public class OfferService {
                 .map(h -> OfferApprovalHistoryDTO.builder()
                         .id(h.getId())
                         .approverName(h.getApproverName())
-                        .approvalDate(h.getCreatedDate())
+                        .approvalDate(h.getOccurredAt())
                         .status(h.getStatus())
                         .comments(h.getComments())
                         .build())
@@ -240,6 +241,7 @@ public class OfferService {
                 .approverName(actorName)
                 .status(status)
                 .comments(comments)
+                .occurredAt(Instant.now())
                 .build());
     }
 

@@ -11,6 +11,7 @@ import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
+import java.time.Instant;
 import java.util.UUID;
 
 /** One row per approval action on an offer letter (Offer Approvals history modal). */
@@ -40,4 +41,10 @@ public class OfferApprovalHistoryEntity extends BaseEntity<UUID> {
 
     @Column(name = "comments", columnDefinition = "TEXT")
     private String comments;
+
+    // Explicit UTC instant for this action - unlike the inherited createdDate (a timezone-less
+    // LocalDateTime captured in the server JVM's default zone), this always serializes with an
+    // offset so the frontend can correctly convert it to the viewer's local time.
+    @Column(name = "occurred_at")
+    private Instant occurredAt;
 }
