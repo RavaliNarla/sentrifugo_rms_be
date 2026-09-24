@@ -3,7 +3,9 @@ package com.sentrifugo.rms.recruiterportal.service;
 import com.sentrifugo.rms.common.exception.CommonException;
 import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
 import com.sentrifugo.rms.common.service.MailService;
+import com.sentrifugo.rms.common.service.NotificationService;
 import com.sentrifugo.rms.common.util.SecurityUtils;
+import com.sentrifugo.rms.db.entity.JobPositionEntity;
 import com.sentrifugo.rms.db.entity.JobRequisitionEntity;
 import com.sentrifugo.rms.db.entity.RequisitionApprovalHistoryEntity;
 import com.sentrifugo.rms.db.entity.RequisitionApproverEntity;
@@ -29,6 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -45,6 +48,7 @@ public class JobRequisitionService {
     private final UserRepository userRepository;
     private final SecurityUtils securityUtils;
     private final MailService mailService;
+    private final NotificationService notificationService;
 
     @Transactional
     public JobRequisitionDTO create(JobRequisitionDTO dto) {
@@ -190,6 +194,19 @@ public class JobRequisitionService {
         }
         jobRequisitionRepository.saveAll(requisitions);
         notifyApprover(ApproverRole.L1, "Requisition(s) submitted for your L1 approval.");
+
+        // Build in-app notifications after status save; emails are async and do not block this API.
+        List<JobPositionEntity> allPositions = jobPositionRepository.findByRequisitionIdIn(requisitionIds);
+        Map<UUID, Long> positionCounts = allPositions.stream()
+                .collect(Collectors.groupingBy(JobPositionEntity::getRequisitionId, Collectors.counting()));
+        for (JobRequisitionEntity requisition : requisitions) {
+            long positionCount = positionCounts.getOrDefault(requisition.getId(), 0L);
+            String code = requisition.getRequisitionCode() != null ? requisition.getRequisitionCode() : requisition.getTitle();
+            notificationService.notifyAdminsAndRecruiters(
+                    NotificationService.TYPE_REQUISITION_SUBMITTED,
+                    "New requisition submitted for approval: " + code
+                            + " — " + positionCount + " position" + (positionCount == 1 ? "" : "s") + ".");
+        }
     }
 
     @Transactional
@@ -274,7 +291,7 @@ public class JobRequisitionService {
             List<RequisitionApproverEntity> approvers = requisitionApproverRepository.findByApproverRole(role);
             for (RequisitionApproverEntity approver : approvers) {
                 Optional<UserEntity> user = userRepository.findById(approver.getApproverId());
-                user.ifPresent(u -> mailService.sendHtmlEmail(u.getEmail(), "Requisition Approval Pending",
+                user.ifPresent(u -> mailService.sendHtmlEmailAsync(u.getEmail(), "Requisition Approval Pending",
                         "<p>Hi " + u.getName() + ",</p><p>" + message + " Please log in to the Sentrifugo RMS Recruiter Portal to review.</p>"));
             }
         } catch (Exception e) {

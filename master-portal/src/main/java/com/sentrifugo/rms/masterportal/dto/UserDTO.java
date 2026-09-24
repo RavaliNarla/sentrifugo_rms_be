@@ -25,4 +25,13 @@ public class UserDTO {
     @NotBlank(message = "Email is required")
     @Email(message = "Email must be valid")
     private String email;
+
+    /** System-generated on create (EMP0001…). Read-only for clients. */
+    private String employeeId;
+
+    /**
+     * Plain password — required when creating a user; never returned from the API.
+     * Leave blank/null on update to keep the existing password.
+     */
+    private String password;
 }

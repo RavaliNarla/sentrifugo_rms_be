@@ -10,8 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * Same pattern as the reference project: a single Bearer-auth scheme in Swagger UI, so any
- * endpoint can be tried with the recruiter/admin's Azure AD access token.
+ * Bearer JWT scheme in Swagger UI — use the access token from POST /api/v1/auth/login.
  */
 @Configuration
 public class SwaggerConfig {

@@ -43,12 +43,13 @@ public class InterviewPoolService {
 
     public Page<InterviewScheduleDTO> getInterviewPool(UUID positionId, List<CandidateStatus> statuses, String searchText, int page, int size) {
         List<CandidateStatus> effectiveStatuses = statuses != null && !statuses.isEmpty() ? statuses :
-                List.of(CandidateStatus.SCHEDULED, CandidateStatus.QUALIFIED, CandidateStatus.DISQUALIFIED);
+                List.of(CandidateStatus.INVITE_SENT, CandidateStatus.SCHEDULED, CandidateStatus.DECLINED,
+                        CandidateStatus.QUALIFIED, CandidateStatus.DISQUALIFIED);
         Page<CandidateEntity> candidatesPage = candidateRepository.search(positionId, effectiveStatuses, searchText, PageRequest.of(page, size));
         return candidatesPage.map(c -> toDto(c, null, true));
     }
 
-    /** Candidates for the currently logged-in interviewer's panel(s), for a given position, optionally filtered to one interview date. */
+    /** Candidates who accepted (or are already in scoring) for the logged-in interviewer's panel(s). */
     public List<InterviewScheduleDTO> getMyInterviews(UUID positionId, LocalDate interviewDate) {
         UUID currentUserId = securityUtils.getCurrentUserId();
         List<UUID> myPanelIds = interviewPanelMemberRepository.findAll().stream()
@@ -56,6 +57,7 @@ public class InterviewPoolService {
                 .map(InterviewPanelMemberEntity::getPanelId)
                 .toList();
 
+        // INVITE_SENT and DECLINED are hidden from the interviewer list.
         Page<CandidateEntity> candidatesPage = candidateRepository.search(positionId,
                 List.of(CandidateStatus.SCHEDULED, CandidateStatus.QUALIFIED, CandidateStatus.DISQUALIFIED),
                 "", PageRequest.of(0, 500));

@@ -20,7 +20,7 @@ public class GetDetailsController {
 
     private final SecurityUtils securityUtils;
 
-    @Operation(summary = "Get the currently signed-in user (resolved from the Azure AD token) and their screen privileges")
+    @Operation(summary = "Get the currently signed-in user and their screen privileges")
     @GetMapping("/user")
     public ResponseEntity<ApiResponse<CurrentUserResponse>> getCurrentUser() {
         UserEntity user = securityUtils.getCurrentUser();
@@ -29,6 +29,7 @@ public class GetDetailsController {
                 .name(user.getName())
                 .email(user.getEmail())
                 .role(user.getRole())
+                .employeeId(user.getEmployeeId())
                 .privileges(securityUtils.getPrivileges(user.getId()))
                 .build();
         return ResponseEntity.ok(ApiResponse.ok(response, "Current user fetched successfully"));

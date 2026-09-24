@@ -7,13 +7,16 @@ import com.sentrifugo.rms.db.enums.RequisitionStatus;
 import com.sentrifugo.rms.db.repository.CandidateOfferRepository;
 import com.sentrifugo.rms.db.repository.CandidateRepository;
 import com.sentrifugo.rms.db.repository.JobRequisitionRepository;
+import com.sentrifugo.rms.recruiterportal.dto.DashboardDetailDTO;
 import com.sentrifugo.rms.recruiterportal.dto.DashboardSummaryDTO;
+import com.sentrifugo.rms.recruiterportal.service.DashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @Tag(name = "Dashboard")
@@ -25,6 +28,7 @@ public class DashboardController {
     private final JobRequisitionRepository jobRequisitionRepository;
     private final CandidateRepository candidateRepository;
     private final CandidateOfferRepository candidateOfferRepository;
+    private final DashboardService dashboardService;
 
     @Operation(summary = "Simple counts for the dashboard landing page")
     @GetMapping("/summary")
@@ -39,7 +43,8 @@ public class DashboardController {
         long shortlisted = candidateRepository.findAll().stream().filter(c -> c.getStatus() == CandidateStatus.SHORTLISTED).count();
         long scheduled = candidateRepository.findAll().stream().filter(c -> c.getStatus() == CandidateStatus.SCHEDULED).count();
         long qualified = candidateRepository.findAll().stream().filter(c -> c.getStatus() == CandidateStatus.QUALIFIED).count();
-        long offersSent = candidateOfferRepository.findAll().stream().filter(o -> o.getStatus() == OfferStatus.SENT || o.getStatus() == OfferStatus.ACCEPTED).count();
+        long offersSent = candidateOfferRepository.findAll().stream()
+                .filter(o -> o.getStatus() == OfferStatus.SENT || o.getStatus() == OfferStatus.ACCEPTED).count();
 
         DashboardSummaryDTO summary = DashboardSummaryDTO.builder()
                 .totalRequisitions(total)
@@ -54,5 +59,11 @@ public class DashboardController {
                 .build();
 
         return ResponseEntity.ok(ApiResponse.ok(summary, "Dashboard summary fetched successfully"));
+    }
+
+    @Operation(summary = "Rows for a dashboard metric tile (same filters as summary counts)")
+    @GetMapping("/details")
+    public ResponseEntity<ApiResponse<DashboardDetailDTO>> details(@RequestParam String metric) {
+        return ResponseEntity.ok(ApiResponse.ok(dashboardService.details(metric), "Dashboard details fetched successfully"));
     }
 }

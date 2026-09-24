@@ -3,14 +3,18 @@ package com.sentrifugo.rms.recruiterportal.controller;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentrifugo.rms.common.dto.ApiResponse;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
+import com.sentrifugo.rms.recruiterportal.dto.CandidateBulkImportResult;
 import com.sentrifugo.rms.recruiterportal.dto.CandidateDTO;
 import com.sentrifugo.rms.recruiterportal.dto.ShortlistDecisionRequest;
+import com.sentrifugo.rms.recruiterportal.service.CandidateBulkImportService;
 import com.sentrifugo.rms.recruiterportal.service.CandidateService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -25,6 +29,7 @@ import java.util.UUID;
 public class CandidateController {
 
     private final CandidateService candidateService;
+    private final CandidateBulkImportService candidateBulkImportService;
     private final ObjectMapper objectMapper;
 
     @Operation(summary = "Add a candidate manually to a position's Candidate Pool (multipart: 'candidate' JSON + optional 'resume' + optional 'idProof' + optional 'photo')")
@@ -95,10 +100,31 @@ public class CandidateController {
         return ResponseEntity.ok(ApiResponse.ok("Candidate shortlisted successfully"));
     }
 
-    @Operation(summary = "Record the shortlist decision: SHORTLIST / REJECT / HOLD (FRS: Yes / No / On Hold)")
+    @Operation(summary = "Record shortlist decision: SHORTLIST / REJECT / HOLD → SHORTLISTED / REJECTED / ON_HOLD")
     @PostMapping("/{id}/decision")
     public ResponseEntity<ApiResponse<Void>> decide(@PathVariable UUID id, @Valid @RequestBody ShortlistDecisionRequest request) {
         candidateService.decide(id, request.getDecision());
         return ResponseEntity.ok(ApiResponse.ok("Decision recorded successfully"));
+    }
+
+    @Operation(summary = "Download XLSX template for bulk candidate import (Name, Phone, Email)")
+    @GetMapping("/bulk-template")
+    public ResponseEntity<byte[]> downloadBulkTemplate() {
+        byte[] bytes = candidateBulkImportService.buildTemplate();
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"candidate-bulk-template.xlsx\"")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(bytes);
+    }
+
+    @Operation(summary = "Bulk-add candidates for a position from an XLSX file (Name, Phone, Email columns)")
+    @PostMapping(value = "/bulk-import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ApiResponse<CandidateBulkImportResult>> bulkImport(
+            @RequestParam UUID positionId,
+            @RequestPart("file") MultipartFile file) {
+        CandidateBulkImportResult result = candidateBulkImportService.importCandidates(positionId, file);
+        String message = result.getSuccessCount() + " candidate(s) imported"
+                + (result.getFailureCount() > 0 ? ", " + result.getFailureCount() + " failed" : "");
+        return ResponseEntity.ok(ApiResponse.ok(result, message));
     }
 }
