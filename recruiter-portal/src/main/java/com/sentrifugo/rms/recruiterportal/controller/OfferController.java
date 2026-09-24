@@ -53,16 +53,17 @@ public class OfferController {
         return ResponseEntity.ok(ApiResponse.ok(request.isApprove() ? "Offer(s) approved" : "Offer(s) rejected"));
     }
 
-    @Operation(summary = "Offer approval queue for the current user's L1/L2 level (server-side candidate-name search/status-filter, paginated) - for the Offer Approvals screen")
+    @Operation(summary = "Offer approval queue for the current user's L1/L2 level (server-side candidate-name search/status/position-filter, paginated) - for the Offer Approvals screen")
     @GetMapping("/pending-approval")
     public ResponseEntity<ApiResponse<Page<CandidateOfferDTO>>> getPendingApprovals(
             @RequestParam(required = false) String search,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) UUID positionId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         OfferStatus statusEnum = (status == null || status.isBlank()) ? null : OfferStatus.valueOf(status);
         return ResponseEntity.ok(ApiResponse.ok(
-                offerService.searchPendingApprovals(search, statusEnum, page, size), "Pending offer approvals fetched successfully"));
+                offerService.searchPendingApprovals(search, statusEnum, positionId, page, size), "Pending offer approvals fetched successfully"));
     }
 
     @Operation(summary = "Get the offer for a candidate (to show the doc icon + preview)")

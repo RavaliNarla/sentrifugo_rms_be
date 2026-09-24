@@ -48,6 +48,7 @@ public class OfferService {
 
     private final CandidateRepository candidateRepository;
     private final JobPositionRepository jobPositionRepository;
+    private final JobRequisitionRepository jobRequisitionRepository;
     private final PositionTitleRepository positionTitleRepository;
     private final DepartmentRepository departmentRepository;
     private final LocationRepository locationRepository;
@@ -70,6 +71,10 @@ public class OfferService {
 
     /** SCL_41: only accepted/rejected offers are locked; everything else can be regenerated and resent. */
     private static final List<OfferStatus> TERMINAL = List.of(OfferStatus.ACCEPTED, OfferStatus.REJECTED);
+
+    // An offer already submitted for L1/L2 approval can't be silently regenerated out from under
+    // the approver - the recruiter must wait for a decision (or have it rejected) first.
+    private static final List<OfferStatus> PENDING_APPROVAL = List.of(OfferStatus.L1_PENDING, OfferStatus.L2_PENDING);
 
     // Offer Approvals screen: statuses visible to each level, mirroring the Requisition Approvals
     // screen (getForL1Approval/getForL2Approval) - decided requests stay visible with their final
@@ -106,6 +111,10 @@ public class OfferService {
                 if (TERMINAL.contains(existingStatus)) {
                     throw new CommonException("Candidate '" + candidate.getName() + "' has already "
                             + existingStatus.name().toLowerCase() + " the offer; a new version cannot be sent.");
+                }
+                if (PENDING_APPROVAL.contains(existingStatus)) {
+                    throw new CommonException("Candidate '" + candidate.getName() + "'s offer is already submitted for "
+                            + existingStatus.name().replace("_PENDING", "") + " approval; it cannot be regenerated until a decision is made.");
                 }
             }
 
@@ -272,8 +281,8 @@ public class OfferService {
         }
     }
 
-    /** Drives the Offer Approvals screen: server-side candidate-name search/status-filter/pagination, newest first. */
-    public Page<CandidateOfferDTO> searchPendingApprovals(String search, OfferStatus status, int page, int size) {
+    /** Drives the Offer Approvals screen: server-side candidate-name search/status/position-filter/pagination, newest first. */
+    public Page<CandidateOfferDTO> searchPendingApprovals(String search, OfferStatus status, UUID positionId, int page, int size) {
         UUID currentUserId = securityUtils.getCurrentUserId();
         RequisitionApproverEntity approver = requisitionApproverRepository.findByApproverId(currentUserId).orElse(null);
         if (approver == null) {
@@ -281,7 +290,7 @@ public class OfferService {
         }
         List<OfferStatus> allowedStatuses = approver.getApproverRole() == ApproverRole.L1 ? L1_VISIBLE_STATUSES : L2_VISIBLE_STATUSES;
         PageRequest pageRequest = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate"));
-        return candidateOfferRepository.searchForApproval(allowedStatuses, status, search, pageRequest)
+        return candidateOfferRepository.searchForApproval(allowedStatuses, status, positionId, search, pageRequest)
                 .map(offer -> toDto(offer, candidateRepository.findById(offer.getCandidateId()).orElse(null)));
     }
 
@@ -401,16 +410,20 @@ public class OfferService {
 
     private CandidateOfferDTO toDto(CandidateOfferEntity entity, CandidateEntity candidate) {
         String positionTitleName = null;
+        String requisitionCode = null;
         if (candidate != null) {
-            positionTitleName = jobPositionRepository.findById(candidate.getPositionId())
-                    .map(p -> positionTitleRepository.findById(p.getPositionTitleId()).map(t -> t.getName()).orElse(null))
-                    .orElse(null);
+            JobPositionEntity position = jobPositionRepository.findById(candidate.getPositionId()).orElse(null);
+            if (position != null) {
+                positionTitleName = positionTitleRepository.findById(position.getPositionTitleId()).map(PositionTitleEntity::getName).orElse(null);
+                requisitionCode = jobRequisitionRepository.findById(position.getRequisitionId()).map(JobRequisitionEntity::getRequisitionCode).orElse(null);
+            }
         }
         return CandidateOfferDTO.builder()
                 .id(entity.getId())
                 .candidateId(entity.getCandidateId())
                 .candidateName(candidate != null ? candidate.getName() : null)
                 .positionTitleName(positionTitleName)
+                .requisitionCode(requisitionCode)
                 .acceptBeforeDate(entity.getAcceptBeforeDate())
                 .joiningDate(entity.getJoiningDate())
                 .offerFileUrl(entity.getOfferFileUrl())

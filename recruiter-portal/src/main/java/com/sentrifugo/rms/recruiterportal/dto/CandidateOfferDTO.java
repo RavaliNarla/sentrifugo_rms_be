@@ -17,6 +17,7 @@ public class CandidateOfferDTO {
     private UUID candidateId;
     private String candidateName;
     private String positionTitleName;
+    private String requisitionCode;
     private LocalDate acceptBeforeDate;
     private LocalDate joiningDate;
     private String offerFileUrl;

@@ -24,15 +24,17 @@ public interface CandidateOfferRepository extends JpaRepository<CandidateOfferEn
     @Query("SELECT o FROM CandidateOfferEntity o WHERE o.supersededTokens IS NOT NULL AND o.supersededTokens LIKE CONCAT('%', :token, '%')")
     Optional<CandidateOfferEntity> findBySupersededTokenContaining(@Param("token") String token);
 
-    // Drives the Offer Approvals screen: server-side candidate-name search + status-filter, paginated,
-    // newest first. allowedStatuses is the fixed set of statuses visible at that approval level; status
-    // further narrows within that set when the approver picks a specific status filter.
+    // Drives the Offer Approvals screen: server-side candidate-name search + status/position-filter,
+    // paginated, newest first. allowedStatuses is the fixed set of statuses visible at that approval
+    // level; status further narrows within that set when the approver picks a specific status filter.
     @Query("SELECT o FROM CandidateOfferEntity o WHERE o.status IN :allowedStatuses AND " +
             "(:status IS NULL OR o.status = :status) AND " +
+            "(:positionId IS NULL OR EXISTS (SELECT 1 FROM CandidateEntity c WHERE c.id = o.candidateId AND c.positionId = :positionId)) AND " +
             "(:search IS NULL OR :search = '' OR EXISTS (SELECT 1 FROM CandidateEntity c WHERE c.id = o.candidateId AND LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))))")
     Page<CandidateOfferEntity> searchForApproval(
             @Param("allowedStatuses") List<OfferStatus> allowedStatuses,
             @Param("status") OfferStatus status,
+            @Param("positionId") UUID positionId,
             @Param("search") String search,
             Pageable pageable);
 }
