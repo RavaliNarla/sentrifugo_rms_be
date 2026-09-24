@@ -17,5 +17,6 @@ public class CurrentUserResponse {
     private String name;
     private String email;
     private String role;
+    private String employeeId;
     private Map<String, Boolean> privileges;
 }

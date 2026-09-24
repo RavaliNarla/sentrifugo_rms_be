@@ -13,6 +13,7 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.UUID;
 
@@ -50,4 +51,18 @@ public class InterviewScheduleEntity extends BaseEntity<UUID> {
     @Column(name = "round", nullable = false)
     @Builder.Default
     private Integer round = 1;
+
+    /** Token for Accept / Decline links in the candidate invite email. */
+    @Column(name = "accept_token", unique = true)
+    private UUID acceptToken;
+
+    /** Prior accept tokens (comma-separated) so old email links resolve as superseded. */
+    @Column(name = "superseded_tokens", length = 4000)
+    private String supersededTokens;
+
+    @Column(name = "invite_sent_at")
+    private LocalDateTime inviteSentAt;
+
+    @Column(name = "invite_responded_at")
+    private LocalDateTime inviteRespondedAt;
 }

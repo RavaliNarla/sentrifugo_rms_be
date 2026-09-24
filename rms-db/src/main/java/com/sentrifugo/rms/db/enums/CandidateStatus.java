@@ -3,11 +3,16 @@ package com.sentrifugo.rms.db.enums;
 public enum CandidateStatus {
     ADDED,
     SHORTLISTED,
-    /** Shortlist decision = No (FRS section 8: Yes / No / On Hold). */
-    NOT_SHORTLISTED,
-    /** Shortlist decision = On Hold - recruiter can revisit later. */
+    /** Shortlist decision = REJECT. */
+    REJECTED,
+    /** Shortlist decision = ON-HOLD (display label: "ON HOLD"). */
     ON_HOLD,
+    /** Interview invite emailed; awaiting Accept / Decline. Slot stays booked. */
+    INVITE_SENT,
+    /** Candidate accepted the interview invite. */
     SCHEDULED,
+    /** Candidate declined the interview invite. Slot is freed. */
+    DECLINED,
     QUALIFIED,
     DISQUALIFIED,
     COMPENSATION_PENDING,

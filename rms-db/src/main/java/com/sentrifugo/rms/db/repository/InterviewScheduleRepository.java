@@ -22,6 +22,10 @@ public interface InterviewScheduleRepository extends JpaRepository<InterviewSche
 
     List<InterviewScheduleEntity> findByPanelIdInAndInterviewDate(Collection<UUID> panelIds, LocalDate interviewDate);
 
+    Optional<InterviewScheduleEntity> findByAcceptToken(UUID acceptToken);
+
+    boolean existsBySupersededTokensContaining(String token);
+
     boolean existsByPanelId(UUID panelId);
 
     @Query("""

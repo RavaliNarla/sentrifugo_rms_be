@@ -6,7 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-/** Section 8 of the requirements doc: shortlist decision is Yes / No / On Hold, not a single button. */
+/** Section 8: shortlist decision is SHORTLIST / REJECT / ON-HOLD. */
 @Data
 @Builder
 @NoArgsConstructor

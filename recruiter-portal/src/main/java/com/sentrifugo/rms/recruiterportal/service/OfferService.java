@@ -4,6 +4,7 @@ import com.sentrifugo.rms.common.exception.CommonException;
 import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
 import com.sentrifugo.rms.common.service.FileStorageService;
 import com.sentrifugo.rms.common.service.MailService;
+import com.sentrifugo.rms.common.service.NotificationService;
 import com.sentrifugo.rms.common.service.PdfConverterService;
 import com.sentrifugo.rms.common.util.SecurityUtils;
 import com.sentrifugo.rms.db.entity.*;
@@ -63,6 +64,7 @@ public class OfferService {
     private final FileStorageService fileStorageService;
     private final MailService mailService;
     private final SecurityUtils securityUtils;
+    private final NotificationService notificationService;
 
     @Value("${app.base.url}")
     private String appBaseUrl;
@@ -179,6 +181,23 @@ public class OfferService {
         }
         candidateOfferRepository.saveAll(offers);
         notifyApprover(ApproverRole.L1, "Offer letter(s) submitted for your L1 approval.");
+
+        for (CandidateOfferEntity offer : offers) {
+            CandidateEntity candidate = candidateRepository.findById(offer.getCandidateId()).orElse(null);
+            if (candidate == null) {
+                continue;
+            }
+            String positionName = jobPositionRepository.findById(candidate.getPositionId())
+                    .map(p -> positionTitleRepository.findById(p.getPositionTitleId()).map(t -> t.getName()).orElse("position"))
+                    .orElse("position");
+            String reqCode = jobRequisitionRepository.findById(candidate.getRequisitionId())
+                    .map(r -> r.getRequisitionCode() != null ? r.getRequisitionCode() : r.getTitle())
+                    .orElse("requisition");
+            notificationService.notifyAdminsAndRecruiters(
+                    NotificationService.TYPE_OFFER_SUBMITTED,
+                    "New offer letter submitted for approval — " + candidate.getName()
+                            + " (" + positionName + ", " + reqCode + ").");
+        }
     }
 
     @Transactional
@@ -335,7 +354,38 @@ public class OfferService {
         offer.setStatus(accept ? OfferStatus.ACCEPTED : OfferStatus.REJECTED);
         offer.setDecidedDate(LocalDateTime.now());
         candidateOfferRepository.save(offer);
+        sendOfferDecisionThankYou(offer, accept);
         return offer.getStatus().name();
+    }
+
+    private void sendOfferDecisionThankYou(CandidateOfferEntity offer, boolean accept) {
+        try {
+            CandidateEntity candidate = candidateRepository.findById(offer.getCandidateId()).orElse(null);
+            if (candidate == null || candidate.getEmail() == null || candidate.getEmail().isBlank()) {
+                return;
+            }
+            String name = candidate.getName() != null ? candidate.getName() : "Candidate";
+            String subject;
+            String html;
+            if (accept) {
+                subject = "Thank you — offer accepted";
+                html = "<p>Dear " + name + ",</p>"
+                        + "<p>Thank you for accepting our offer. We are delighted to welcome you aboard.</p>"
+                        + "<p>Our team will be in touch with next steps regarding joining formalities"
+                        + (offer.getJoiningDate() != null ? " (joining date: <b>" + offer.getJoiningDate() + "</b>)" : "")
+                        + ".</p>"
+                        + "<p>Warm regards,<br/>Sagar Recruitment Hub</p>";
+            } else {
+                subject = "Thank you — offer response received";
+                html = "<p>Dear " + name + ",</p>"
+                        + "<p>Thank you for letting us know your decision on the offer.</p>"
+                        + "<p>We appreciate the time you spent with us and wish you the very best in your future endeavours.</p>"
+                        + "<p>Warm regards,<br/>Sagar Recruitment Hub</p>";
+            }
+            mailService.sendHtmlEmailAsync(candidate.getEmail(), subject, html);
+        } catch (Exception e) {
+            log.warn("Failed to send offer decision thank-you email: {}", e.getMessage());
+        }
     }
 
     private String renderOfferHtml(CandidateEntity candidate, OfferTemplateEntity template, LocalDate acceptBeforeDate, LocalDate joiningDate) {
@@ -402,7 +452,7 @@ public class OfferService {
             List<RequisitionApproverEntity> approvers = requisitionApproverRepository.findByApproverRole(role);
             for (RequisitionApproverEntity approver : approvers) {
                 Optional<UserEntity> user = userRepository.findById(approver.getApproverId());
-                user.ifPresent(u -> mailService.sendHtmlEmail(u.getEmail(), "Offer Letter Approval Pending",
+                user.ifPresent(u -> mailService.sendHtmlEmailAsync(u.getEmail(), "Offer Letter Approval Pending",
                         "<p>Hi " + u.getName() + ",</p><p>" + message + " Please log in to the Sentrifugo RMS Recruiter Portal to review.</p>"));
             }
         } catch (Exception e) {

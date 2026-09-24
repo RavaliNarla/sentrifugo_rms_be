@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Hibernate ddl-auto=update does not revise Postgres CHECK constraints.
- * SCL_25 added ON_HOLD / NOT_SHORTLISTED to CandidateStatus; ensure the DB check allows them.
+ * Keep candidates_status_check aligned with CandidateStatus (incl. REJECTED).
  */
 @Slf4j
 @Component
@@ -23,15 +23,20 @@ public class SchemaConstraintFixer implements CommandLineRunner {
     public void run(String... args) {
         try {
             jdbcTemplate.execute("ALTER TABLE recruitment.candidates DROP CONSTRAINT IF EXISTS candidates_status_check");
+            int updated = jdbcTemplate.update(
+                    "UPDATE recruitment.candidates SET status = 'REJECTED' WHERE status = 'NOT_SHORTLISTED'");
+            if (updated > 0) {
+                log.info("Backfilled {} candidate(s) from NOT_SHORTLISTED → REJECTED", updated);
+            }
             jdbcTemplate.execute("""
                     ALTER TABLE recruitment.candidates ADD CONSTRAINT candidates_status_check CHECK (
                       status::text = ANY (ARRAY[
-                        'ADDED','SHORTLISTED','NOT_SHORTLISTED','ON_HOLD','SCHEDULED',
+                        'ADDED','SHORTLISTED','REJECTED','ON_HOLD','INVITE_SENT','SCHEDULED','DECLINED',
                         'QUALIFIED','DISQUALIFIED','COMPENSATION_PENDING','MOVED_TO_OFFER'
                       ]::text[])
                     )
                     """);
-            log.info("Ensured recruitment.candidates_status_check includes ON_HOLD and NOT_SHORTLISTED");
+            log.info("Ensured recruitment.candidates_status_check includes INVITE_SENT and DECLINED");
         } catch (Exception e) {
             log.warn("Could not refresh candidates_status_check: {}", e.getMessage());
         }

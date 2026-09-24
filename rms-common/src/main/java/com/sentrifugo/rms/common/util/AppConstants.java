@@ -10,6 +10,9 @@ public class AppConstants {
             "/swagger-ui/**",
             "/swagger-ui.html",
             "/api/v1/public/**",
+            "/api/v1/auth/login",
+            "/api/v1/auth/forgot-password",
+            "/api/v1/auth/reset-password",
             "/actuator/health"
     };
 
@@ -18,4 +21,7 @@ public class AppConstants {
     public static final String ROLE_ADMIN = "ADMIN";
     public static final String ROLE_RECRUITER = "RECRUITER";
     public static final String ROLE_COMMITTEE_MEMBER = "COMMITTEE_MEMBER";
+
+    /** Default password applied when backfilling existing users (change via Forgot Password). */
+    public static final String DEFAULT_USER_PASSWORD = "Sagarsoft@12345";
 }

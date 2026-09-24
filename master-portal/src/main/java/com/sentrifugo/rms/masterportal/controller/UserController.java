@@ -33,13 +33,13 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok(userService.getAll(search, page, size), "Users fetched successfully"));
     }
 
-    @Operation(summary = "Add a user (email must match their Azure AD account to allow login)")
+    @Operation(summary = "Add a user (generates Employee ID; password required for login)")
     @PostMapping("/add")
     public ResponseEntity<ApiResponse<UserDTO>> add(@Valid @RequestBody UserDTO dto) {
         return ResponseEntity.ok(ApiResponse.ok(userService.add(dto), "User added successfully"));
     }
 
-    @Operation(summary = "Update a user's name/role")
+    @Operation(summary = "Update a user's name/role (optional password change)")
     @PutMapping("/update/{id}")
     public ResponseEntity<ApiResponse<UserDTO>> update(@PathVariable UUID id, @Valid @RequestBody UserDTO dto) {
         return ResponseEntity.ok(ApiResponse.ok(userService.update(id, dto), "User updated successfully"));

@@ -2,28 +2,23 @@ package com.sentrifugo.rms.common.config;
 
 import com.sentrifugo.rms.common.util.AppConstants;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtDecoders;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
- * Single Azure AD resource-server chain. No candidate auth, no CSRF, no Vault -
- * this app is recruiter/admin/committee-member only, all via Entra ID.
+ * Resource-server chain for locally issued HS256 JWTs (password login via auth-portal).
  */
 @Configuration
 @EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Value("${spring.security.oauth2.resourceserver.jwt.issuer-uri}")
-    private String issuerUri;
-
-    private final AzureAuthentication azureAuthentication;
+    private final LocalJwtAuthentication localJwtAuthentication;
+    private final JwtDecoder jwtDecoder;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -35,14 +30,9 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(jwt -> jwt.decoder(azureJwtDecoder())
-                                .jwtAuthenticationConverter(azureAuthentication))
+                        oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)
+                                .jwtAuthenticationConverter(localJwtAuthentication))
                 );
         return http.build();
-    }
-
-    @Bean
-    public JwtDecoder azureJwtDecoder() {
-        return JwtDecoders.fromIssuerLocation(issuerUri);
     }
 }

@@ -11,6 +11,7 @@ import lombok.experimental.SuperBuilder;
 import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
@@ -32,4 +33,19 @@ public class UserEntity extends BaseEntity<UUID> {
 
     @Column(name = "email", nullable = false, unique = true)
     private String email;
+
+    /** Stable login code shown in Admin → Users (e.g. EMP0001). */
+    @Column(name = "employee_id", unique = true, length = 32)
+    private String employeeId;
+
+    /** BCrypt hash — never returned in API responses. */
+    @Column(name = "password_hash", length = 100)
+    private String passwordHash;
+
+    /** Plain OTP for password reset (readable in DB for preview/testing). */
+    @Column(name = "reset_otp", length = 12)
+    private String resetOtp;
+
+    @Column(name = "reset_otp_expires_at")
+    private LocalDateTime resetOtpExpiresAt;
 }
