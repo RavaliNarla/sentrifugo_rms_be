@@ -1,7 +1,7 @@
 package com.sentrifugo.rms.masterportal.controller;
 
 import com.sentrifugo.rms.common.dto.ApiResponse;
-import com.sentrifugo.rms.masterportal.dto.NamedMasterDTO;
+import com.sentrifugo.rms.masterportal.dto.EducationQualificationDTO;
 import com.sentrifugo.rms.masterportal.service.EducationQualificationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -24,13 +24,13 @@ public class EducationQualificationController {
 
     @Operation(summary = "Full unpaginated list - used to populate dropdowns elsewhere")
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<NamedMasterDTO>>> getAll(@RequestParam(required = false) String search) {
+    public ResponseEntity<ApiResponse<List<EducationQualificationDTO>>> getAll(@RequestParam(required = false) String search) {
         return ResponseEntity.ok(ApiResponse.ok(service.getAll(search), "Education qualifications fetched successfully"));
     }
 
     @Operation(summary = "Paginated + searchable list - drives the Education Qualifications admin screen")
     @GetMapping("/search")
-    public ResponseEntity<ApiResponse<Page<NamedMasterDTO>>> search(
+    public ResponseEntity<ApiResponse<Page<EducationQualificationDTO>>> search(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
@@ -38,12 +38,12 @@ public class EducationQualificationController {
     }
 
     @PostMapping("/add")
-    public ResponseEntity<ApiResponse<NamedMasterDTO>> add(@Valid @RequestBody NamedMasterDTO dto) {
+    public ResponseEntity<ApiResponse<EducationQualificationDTO>> add(@Valid @RequestBody EducationQualificationDTO dto) {
         return ResponseEntity.ok(ApiResponse.ok(service.add(dto), "Education qualification added successfully"));
     }
 
     @PutMapping("/update/{id}")
-    public ResponseEntity<ApiResponse<NamedMasterDTO>> update(@PathVariable UUID id, @Valid @RequestBody NamedMasterDTO dto) {
+    public ResponseEntity<ApiResponse<EducationQualificationDTO>> update(@PathVariable UUID id, @Valid @RequestBody EducationQualificationDTO dto) {
         return ResponseEntity.ok(ApiResponse.ok(service.update(id, dto), "Education qualification updated successfully"));
     }
 

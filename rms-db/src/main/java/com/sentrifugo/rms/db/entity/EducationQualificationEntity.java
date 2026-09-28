@@ -26,4 +26,7 @@ public class EducationQualificationEntity extends BaseEntity<UUID> {
 
     @Column(name = "name", nullable = false, unique = true)
     private String name;
+
+    @Column(name = "description", columnDefinition = "TEXT")
+    private String description;
 }

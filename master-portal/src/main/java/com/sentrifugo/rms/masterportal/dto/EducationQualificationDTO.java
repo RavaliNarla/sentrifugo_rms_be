@@ -8,11 +8,12 @@ import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
+/** Education Qualification master: name plus an optional description. */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CertificationDTO {
+public class EducationQualificationDTO {
     private UUID id;
 
     @NotBlank(message = "Name is required")

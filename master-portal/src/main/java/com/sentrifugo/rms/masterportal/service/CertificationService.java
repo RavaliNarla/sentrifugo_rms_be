@@ -40,7 +40,7 @@ public class CertificationService {
         if (repository.existsByNameIgnoreCase(dto.getName())) {
             throw new CommonException("A certification with this name already exists.");
         }
-        CertificationEntity entity = repository.save(CertificationEntity.builder().name(dto.getName()).build());
+        CertificationEntity entity = repository.save(CertificationEntity.builder().name(dto.getName()).description(trimToNull(dto.getDescription())).build());
         return toDto(entity);
     }
 
@@ -48,6 +48,7 @@ public class CertificationService {
         CertificationEntity entity = repository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Certification not found"));
         entity.setName(dto.getName());
+        entity.setDescription(trimToNull(dto.getDescription()));
         return toDto(repository.save(entity));
     }
 
@@ -59,6 +60,10 @@ public class CertificationService {
     }
 
     private CertificationDTO toDto(CertificationEntity entity) {
-        return CertificationDTO.builder().id(entity.getId()).name(entity.getName()).build();
+        return CertificationDTO.builder().id(entity.getId()).name(entity.getName()).description(entity.getDescription()).build();
+    }
+
+    private static String trimToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }
