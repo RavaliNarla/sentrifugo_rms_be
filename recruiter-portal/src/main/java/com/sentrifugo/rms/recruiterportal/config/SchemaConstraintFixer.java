@@ -29,7 +29,7 @@ public class SchemaConstraintFixer implements CommandLineRunner {
             jdbcTemplate.execute("""
                     ALTER TABLE recruitment.candidates ADD CONSTRAINT candidates_status_check CHECK (
                       status::text = ANY (ARRAY[
-                        'ADDED','SHORTLISTED','REJECTED','ON_HOLD','INVITE_SENT','SCHEDULED','DECLINED',
+                        'DRAFT','ADDED','SHORTLISTED','REJECTED','ON_HOLD','INVITE_SENT','SCHEDULED','DECLINED',
                         'QUALIFIED','DISQUALIFIED','COMPENSATION_PENDING','MOVED_TO_OFFER'
                       ]::text[])
                     )

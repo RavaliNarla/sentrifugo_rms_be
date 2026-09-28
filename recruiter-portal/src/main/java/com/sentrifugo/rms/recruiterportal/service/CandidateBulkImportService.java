@@ -120,7 +120,7 @@ public class CandidateBulkImportService {
                             .phone(phone)
                             .email(email)
                             .build();
-                    candidateService.add(dto, null, null, null);
+                    candidateService.add(dto, null, null, null, false);
                     success++;
                 } catch (Exception ex) {
                     failure++;

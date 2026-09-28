@@ -30,4 +30,11 @@ public interface CandidateRepository extends JpaRepository<CandidateEntity, UUID
     List<CandidateEntity> findByIdIn(List<UUID> ids);
 
     long countByPositionIdAndStatus(UUID positionId, CandidateStatus status);
+
+    // Email/phone must be unique across all candidates - excludeId variants let an update
+    // ignore the candidate's own current row.
+    boolean existsByEmailIgnoreCase(String email);
+    boolean existsByPhone(String phone);
+    boolean existsByEmailIgnoreCaseAndIdNot(String email, UUID id);
+    boolean existsByPhoneAndIdNot(String phone, UUID id);
 }

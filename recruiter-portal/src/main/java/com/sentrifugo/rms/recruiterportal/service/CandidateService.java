@@ -23,6 +23,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Set;
@@ -33,6 +34,9 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 public class CandidateService {
+
+    /** Edit / delete / document removal are allowed only before any workflow progress. */
+    private static final Set<CandidateStatus> EDITABLE_STATUSES = EnumSet.of(CandidateStatus.DRAFT, CandidateStatus.ADDED);
 
     /** Shortlist stage: first decision from ADDED, then only among these three outcomes. */
     private static final Set<CandidateStatus> SHORTLIST_DECISION_ALLOWED = EnumSet.of(
@@ -60,10 +64,35 @@ public class CandidateService {
 
     @Transactional
     public CandidateDTO add(CandidateDTO dto, MultipartFile resume, MultipartFile idProof, MultipartFile photo) {
+        return add(dto, resume, idProof, photo, true);
+    }
+
+    /**
+     * requireResume is false for bulk (Excel) import, which only collects Name/Phone/Email -
+     * the single Add Candidate form (requireResume=true) is the only place a resume is mandatory.
+     */
+    @Transactional
+    public CandidateDTO add(CandidateDTO dto, MultipartFile resume, MultipartFile idProof, MultipartFile photo, boolean requireResume) {
         JobPositionEntity position = jobPositionRepository.findById(dto.getPositionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Position not found"));
 
         validateContactFields(dto);
+        if (resume != null && resume.isEmpty() && resume.getOriginalFilename() != null && !resume.getOriginalFilename().isBlank()) {
+            throw new CommonException("The uploaded resume file is empty (0 bytes). Please choose a resume with content.");
+        }
+        if (requireResume && (resume == null || resume.isEmpty())) {
+            throw new CommonException("Resume is required.");
+        }
+        List<String> contactConflicts = new ArrayList<>();
+        if (candidateRepository.existsByEmailIgnoreCase(dto.getEmail())) {
+            contactConflicts.add("A candidate with this email already exists.");
+        }
+        if (candidateRepository.existsByPhone(dto.getPhone())) {
+            contactConflicts.add("A candidate with this phone number already exists.");
+        }
+        if (!contactConflicts.isEmpty()) {
+            throw new CommonException(String.join(" ", contactConflicts));
+        }
 
         CandidateEntity entity = CandidateEntity.builder()
                 .requisitionId(position.getRequisitionId())
@@ -71,7 +100,7 @@ public class CandidateService {
                 .name(dto.getName())
                 .phone(dto.getPhone())
                 .email(dto.getEmail())
-                .status(CandidateStatus.ADDED)
+                .status((resume != null && !resume.isEmpty()) ? CandidateStatus.ADDED : CandidateStatus.DRAFT)
                 .build();
 
         if (resume != null && !resume.isEmpty()) {
@@ -92,10 +121,27 @@ public class CandidateService {
     public CandidateDTO update(UUID id, CandidateDTO dto, MultipartFile resume, MultipartFile idProof, MultipartFile photo) {
         CandidateEntity entity = candidateRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
-        if (entity.getStatus() != CandidateStatus.ADDED) {
+        if (!EDITABLE_STATUSES.contains(entity.getStatus())) {
             throw new CommonException("Only newly-added candidates can be edited.");
         }
         validateContactFields(dto);
+        if (resume != null && resume.isEmpty() && resume.getOriginalFilename() != null && !resume.getOriginalFilename().isBlank()) {
+            throw new CommonException("The uploaded resume file is empty (0 bytes). Please choose a resume with content.");
+        }
+        boolean hasResumeAfterSave = (resume != null && !resume.isEmpty()) || entity.getResumeUrl() != null;
+        if (!hasResumeAfterSave) {
+            throw new CommonException("Resume is required.");
+        }
+        List<String> contactConflicts = new ArrayList<>();
+        if (candidateRepository.existsByEmailIgnoreCaseAndIdNot(dto.getEmail(), id)) {
+            contactConflicts.add("A candidate with this email already exists.");
+        }
+        if (candidateRepository.existsByPhoneAndIdNot(dto.getPhone(), id)) {
+            contactConflicts.add("A candidate with this phone number already exists.");
+        }
+        if (!contactConflicts.isEmpty()) {
+            throw new CommonException(String.join(" ", contactConflicts));
+        }
 
         entity.setName(dto.getName());
         entity.setPhone(dto.getPhone());
@@ -109,6 +155,9 @@ public class CandidateService {
         if (photo != null && !photo.isEmpty()) {
             entity.setPhotoUrl(fileStorageService.store(photo, PHOTO_FOLDER));
         }
+        if (entity.getStatus() == CandidateStatus.DRAFT && entity.getResumeUrl() != null) {
+            entity.setStatus(CandidateStatus.ADDED);
+        }
         return toDto(candidateRepository.save(entity));
     }
 
@@ -117,7 +166,7 @@ public class CandidateService {
     public void delete(UUID id) {
         CandidateEntity entity = candidateRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
-        if (entity.getStatus() != CandidateStatus.ADDED) {
+        if (!EDITABLE_STATUSES.contains(entity.getStatus())) {
             throw new CommonException("Only newly-added candidates can be deleted.");
         }
         candidateRepository.delete(entity);
@@ -131,7 +180,7 @@ public class CandidateService {
     public CandidateDTO deleteDocument(UUID id, String documentType) {
         CandidateEntity entity = candidateRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
-        if (entity.getStatus() != CandidateStatus.ADDED) {
+        if (!EDITABLE_STATUSES.contains(entity.getStatus())) {
             throw new CommonException("Only newly-added candidates can have documents removed.");
         }
 
