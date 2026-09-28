@@ -131,6 +131,9 @@ public class JobPositionService {
         if (dto.getEmploymentType() == null || dto.getEmploymentType().isBlank()) {
             throw new CommonException("Employment Type is required.");
         }
+        if (!Boolean.TRUE.equals(dto.getMedicalFitnessRequired())) {
+            throw new CommonException("Medical Fitness Required must be checked.");
+        }
         if (dto.getApprovedById() == null) {
             throw new CommonException("Approved By is required.");
         }

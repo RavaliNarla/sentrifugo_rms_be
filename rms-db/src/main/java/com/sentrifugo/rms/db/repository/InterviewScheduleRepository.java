@@ -1,6 +1,7 @@
 package com.sentrifugo.rms.db.repository;
 
 import com.sentrifugo.rms.db.entity.InterviewScheduleEntity;
+import com.sentrifugo.rms.db.enums.CandidateStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -27,6 +28,17 @@ public interface InterviewScheduleRepository extends JpaRepository<InterviewSche
     boolean existsBySupersededTokensContaining(String token);
 
     boolean existsByPanelId(UUID panelId);
+
+    /** Positions that have at least one candidate in the given statuses scheduled on one of these panels. */
+    @Query("""
+            SELECT DISTINCT c.positionId FROM InterviewScheduleEntity s, CandidateEntity c
+            WHERE c.id = s.candidateId
+              AND s.panelId IN :panelIds
+              AND c.status IN :statuses
+            """)
+    List<UUID> findPositionIdsForPanels(
+            @Param("panelIds") Collection<UUID> panelIds,
+            @Param("statuses") Collection<CandidateStatus> statuses);
 
     @Query("""
             SELECT s FROM InterviewScheduleEntity s

@@ -216,8 +216,26 @@ public class CandidateService {
     }
 
     public Page<CandidateDTO> search(UUID positionId, List<CandidateStatus> statuses, String searchText, int page, int size) {
-        return candidateRepository.search(positionId, statuses, searchText, PageRequest.of(page, size))
-                .map(this::toDto);
+        return search(positionId, statuses, searchText, null, page, size);
+    }
+
+    /** Value of offerStatus meaning "no offer generated yet" (Offer Pool status filter). */
+    public static final String OFFER_NOT_GENERATED = "NOT_GENERATED";
+
+    /** offerStatus (optional): an OfferStatus name, or NOT_GENERATED for candidates without an offer. */
+    public Page<CandidateDTO> search(UUID positionId, List<CandidateStatus> statuses, String searchText,
+                                     String offerStatus, int page, int size) {
+        PageRequest pageRequest = PageRequest.of(page, size);
+        Page<CandidateEntity> result;
+        if (offerStatus == null || offerStatus.isBlank()) {
+            result = candidateRepository.search(positionId, statuses, searchText, pageRequest);
+        } else if (OFFER_NOT_GENERATED.equalsIgnoreCase(offerStatus)) {
+            result = candidateRepository.searchWithoutOffer(positionId, statuses, searchText, pageRequest);
+        } else {
+            result = candidateRepository.searchByOfferStatus(positionId, statuses, searchText,
+                    com.sentrifugo.rms.db.enums.OfferStatus.valueOf(offerStatus), pageRequest);
+        }
+        return result.map(this::toDto);
     }
 
     public CandidateDTO getById(UUID id) {

@@ -2,6 +2,7 @@ package com.sentrifugo.rms.db.repository;
 
 import com.sentrifugo.rms.db.entity.CandidateEntity;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
+import com.sentrifugo.rms.db.enums.OfferStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,6 +27,35 @@ public interface CandidateRepository extends JpaRepository<CandidateEntity, UUID
                                   @Param("statuses") List<CandidateStatus> statuses,
                                   @Param("searchText") String searchText,
                                   Pageable pageable);
+
+    // Offer Pool status filter: candidates whose offer is in a given status...
+    @Query("""
+        SELECT c FROM CandidateEntity c
+        WHERE c.positionId = :positionId
+          AND (:statuses IS NULL OR c.status IN :statuses)
+          AND (:searchText IS NULL OR :searchText = '' OR LOWER(c.name) LIKE LOWER(CONCAT('%', :searchText, '%')))
+          AND EXISTS (SELECT 1 FROM CandidateOfferEntity o WHERE o.candidateId = c.id AND o.status = :offerStatus)
+        ORDER BY c.createdDate DESC
+        """)
+    Page<CandidateEntity> searchByOfferStatus(@Param("positionId") UUID positionId,
+                                              @Param("statuses") List<CandidateStatus> statuses,
+                                              @Param("searchText") String searchText,
+                                              @Param("offerStatus") OfferStatus offerStatus,
+                                              Pageable pageable);
+
+    // ...or candidates with no offer generated yet.
+    @Query("""
+        SELECT c FROM CandidateEntity c
+        WHERE c.positionId = :positionId
+          AND (:statuses IS NULL OR c.status IN :statuses)
+          AND (:searchText IS NULL OR :searchText = '' OR LOWER(c.name) LIKE LOWER(CONCAT('%', :searchText, '%')))
+          AND NOT EXISTS (SELECT 1 FROM CandidateOfferEntity o WHERE o.candidateId = c.id)
+        ORDER BY c.createdDate DESC
+        """)
+    Page<CandidateEntity> searchWithoutOffer(@Param("positionId") UUID positionId,
+                                             @Param("statuses") List<CandidateStatus> statuses,
+                                             @Param("searchText") String searchText,
+                                             Pageable pageable);
 
     List<CandidateEntity> findByIdIn(List<UUID> ids);
 

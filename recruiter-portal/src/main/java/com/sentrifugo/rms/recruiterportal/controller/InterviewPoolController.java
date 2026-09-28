@@ -39,6 +39,18 @@ public class InterviewPoolController {
                 "Interview pool fetched successfully"));
     }
 
+    @Operation(summary = "Requisitions that have interviews scheduled on the current interviewer's panel(s) - for the Interviewer Schedule dropdown")
+    @GetMapping("/my-requisitions")
+    public ResponseEntity<ApiResponse<List<com.sentrifugo.rms.recruiterportal.dto.JobRequisitionDTO>>> myRequisitions() {
+        return ResponseEntity.ok(ApiResponse.ok(interviewPoolService.getMyInterviewRequisitions(), "Your requisitions fetched successfully"));
+    }
+
+    @Operation(summary = "Position ids under a requisition that have interviews scheduled on the current interviewer's panel(s)")
+    @GetMapping("/my-position-ids")
+    public ResponseEntity<ApiResponse<List<UUID>>> myPositionIds(@RequestParam UUID requisitionId) {
+        return ResponseEntity.ok(ApiResponse.ok(interviewPoolService.getMyInterviewPositionIds(requisitionId), "Your positions fetched successfully"));
+    }
+
     @Operation(summary = "List candidates scheduled with the current interviewer's panel(s) for a position, optionally filtered to one interview date")
     @GetMapping("/my-interviews")
     public ResponseEntity<ApiResponse<List<InterviewScheduleDTO>>> myInterviews(

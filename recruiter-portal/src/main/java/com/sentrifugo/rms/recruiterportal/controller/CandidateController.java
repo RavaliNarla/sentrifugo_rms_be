@@ -78,12 +78,13 @@ public class CandidateController {
             @RequestParam UUID positionId,
             @RequestParam(required = false) List<String> statuses,
             @RequestParam(required = false, defaultValue = "") String searchText,
+            @RequestParam(required = false) String offerStatus,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         List<CandidateStatus> statusList = statuses == null || statuses.isEmpty() ? null :
                 statuses.stream().map(CandidateStatus::valueOf).toList();
         return ResponseEntity.ok(ApiResponse.ok(
-                candidateService.search(positionId, statusList, searchText, page, size),
+                candidateService.search(positionId, statusList, searchText, offerStatus, page, size),
                 "Candidates fetched successfully"));
     }
 

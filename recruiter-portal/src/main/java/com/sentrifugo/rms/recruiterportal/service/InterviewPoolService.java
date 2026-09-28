@@ -7,6 +7,7 @@ import com.sentrifugo.rms.db.entity.*;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
 import com.sentrifugo.rms.db.repository.*;
 import com.sentrifugo.rms.recruiterportal.dto.InterviewScheduleDTO;
+import com.sentrifugo.rms.recruiterportal.dto.JobRequisitionDTO;
 import com.sentrifugo.rms.recruiterportal.dto.PanelMemberScoreViewDTO;
 import com.sentrifugo.rms.recruiterportal.dto.ScoreSubmitRequest;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +20,10 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -38,6 +41,8 @@ public class InterviewPoolService {
     private final InterviewPanelMemberRepository interviewPanelMemberRepository;
     private final PanelMemberScoreRepository panelMemberScoreRepository;
     private final InterviewPanelRepository interviewPanelRepository;
+    private final JobPositionRepository jobPositionRepository;
+    private final JobRequisitionRepository jobRequisitionRepository;
     private final UserRepository userRepository;
     private final SecurityUtils securityUtils;
 
@@ -50,17 +55,62 @@ public class InterviewPoolService {
     }
 
     /** Candidates who accepted (or are already in scoring) for the logged-in interviewer's panel(s). */
-    public List<InterviewScheduleDTO> getMyInterviews(UUID positionId, LocalDate interviewDate) {
+    // INVITE_SENT and DECLINED are hidden from the interviewer list (and so from its dropdowns).
+    private static final List<CandidateStatus> INTERVIEWER_VISIBLE_STATUSES =
+            List.of(CandidateStatus.SCHEDULED, CandidateStatus.QUALIFIED, CandidateStatus.DISQUALIFIED);
+
+    private List<UUID> currentUserPanelIds() {
         UUID currentUserId = securityUtils.getCurrentUserId();
-        List<UUID> myPanelIds = interviewPanelMemberRepository.findAll().stream()
+        return interviewPanelMemberRepository.findAll().stream()
                 .filter(m -> m.getUserId().equals(currentUserId))
                 .map(InterviewPanelMemberEntity::getPanelId)
                 .toList();
+    }
 
-        // INVITE_SENT and DECLINED are hidden from the interviewer list.
+    /** Positions where the current user's panel(s) have interviews visible in the interviewer list. */
+    private List<JobPositionEntity> myInterviewPositions() {
+        List<UUID> myPanelIds = currentUserPanelIds();
+        if (myPanelIds.isEmpty()) {
+            return List.of();
+        }
+        List<UUID> positionIds = interviewScheduleRepository.findPositionIdsForPanels(myPanelIds, INTERVIEWER_VISIBLE_STATUSES);
+        return positionIds.isEmpty() ? List.of() : jobPositionRepository.findAllById(positionIds);
+    }
+
+    /** Interviewer Schedule "Requisition" dropdown: only requisitions with interviews on my panels. */
+    public List<JobRequisitionDTO> getMyInterviewRequisitions() {
+        Set<UUID> requisitionIds = myInterviewPositions().stream()
+                .map(JobPositionEntity::getRequisitionId)
+                .collect(Collectors.toSet());
+        if (requisitionIds.isEmpty()) {
+            return List.of();
+        }
+        return jobRequisitionRepository.findAllById(requisitionIds).stream()
+                .sorted(Comparator.comparing(JobRequisitionEntity::getRequisitionCode,
+                        Comparator.nullsLast(Comparator.reverseOrder())))
+                .map(r -> JobRequisitionDTO.builder()
+                        .id(r.getId())
+                        .title(r.getTitle())
+                        .requisitionCode(r.getRequisitionCode())
+                        .status(r.getStatus().name())
+                        .build())
+                .toList();
+    }
+
+    /** Interviewer Schedule "Position" dropdown: position ids under a requisition with interviews on my panels. */
+    public List<UUID> getMyInterviewPositionIds(UUID requisitionId) {
+        return myInterviewPositions().stream()
+                .filter(p -> requisitionId.equals(p.getRequisitionId()))
+                .map(JobPositionEntity::getId)
+                .toList();
+    }
+
+    public List<InterviewScheduleDTO> getMyInterviews(UUID positionId, LocalDate interviewDate) {
+        UUID currentUserId = securityUtils.getCurrentUserId();
+        List<UUID> myPanelIds = currentUserPanelIds();
+
         Page<CandidateEntity> candidatesPage = candidateRepository.search(positionId,
-                List.of(CandidateStatus.SCHEDULED, CandidateStatus.QUALIFIED, CandidateStatus.DISQUALIFIED),
-                "", PageRequest.of(0, 500));
+                INTERVIEWER_VISIBLE_STATUSES, "", PageRequest.of(0, 500));
 
         return candidatesPage.getContent().stream()
                 .map(c -> toDto(c, currentUserId, false))
