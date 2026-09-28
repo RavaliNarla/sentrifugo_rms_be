@@ -264,6 +264,10 @@ public class CandidateService {
             case REJECT -> CandidateStatus.REJECTED;
             case HOLD -> CandidateStatus.ON_HOLD;
         };
+        // Re-applying the current decision would be a no-op that re-sends the status email.
+        if (entity.getStatus() == next) {
+            throw new CommonException("Candidate is already " + next.name().replace('_', ' ') + ".");
+        }
         entity.setStatus(next);
         candidateRepository.save(entity);
 
