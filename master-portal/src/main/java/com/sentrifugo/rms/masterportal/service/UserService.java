@@ -12,6 +12,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -31,6 +32,7 @@ public class UserService {
         return entities.map(this::toDto);
     }
 
+    @Transactional
     public UserDTO add(UserDTO dto) {
         if (dto.getPassword() == null || dto.getPassword().isBlank()) {
             throw new CommonException("Password is required.");
@@ -38,13 +40,30 @@ public class UserService {
         if (dto.getPassword().length() < 8) {
             throw new CommonException("Password must be at least 8 characters.");
         }
-        userRepository.findByEmailIgnoreCase(dto.getEmail()).ifPresent(existing -> {
-            throw new CommonException("A user with this email already exists.");
-        });
+        String email = dto.getEmail().trim();
+
+        // Soft-deleted rows still occupy the unique email index — reactivate instead of insert.
+        UserEntity inactiveMatch = userRepository.findIncludingInactiveByEmailIgnoreCase(email).orElse(null);
+        if (inactiveMatch != null) {
+            if (Boolean.TRUE.equals(inactiveMatch.getIsActive())) {
+                throw new CommonException("A user with this email already exists.");
+            }
+            inactiveMatch.setIsActive(true);
+            inactiveMatch.setName(dto.getName().trim());
+            inactiveMatch.setRole(dto.getRole());
+            inactiveMatch.setEmail(email);
+            inactiveMatch.setPasswordHash(passwordEncoder.encode(dto.getPassword()));
+            if (inactiveMatch.getEmployeeId() == null || inactiveMatch.getEmployeeId().isBlank()
+                    || inactiveMatch.getEmployeeId().startsWith("DEL-")) {
+                inactiveMatch.setEmployeeId(employeeIdService.nextEmployeeId());
+            }
+            return toDto(userRepository.save(inactiveMatch));
+        }
+
         UserEntity entity = UserEntity.builder()
                 .name(dto.getName().trim())
                 .role(dto.getRole())
-                .email(dto.getEmail().trim())
+                .email(email)
                 .employeeId(employeeIdService.nextEmployeeId())
                 .passwordHash(passwordEncoder.encode(dto.getPassword()))
                 .build();
@@ -65,11 +84,24 @@ public class UserService {
         return toDto(userRepository.save(entity));
     }
 
+    /**
+     * Soft-delete and free the email/employee_id unique slots so the same values can be reused
+     * (reactivation path in {@link #add} still works if we didn't rename — rename is belt-and-suspenders).
+     */
+    @Transactional
     public void delete(UUID id) {
-        if (!userRepository.existsById(id)) {
-            throw new ResourceNotFoundException("User not found");
+        UserEntity entity = userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+        String originalEmail = entity.getEmail();
+        String originalEmp = entity.getEmployeeId();
+        entity.setEmail("deleted." + id + "." + originalEmail);
+        if (originalEmp != null && !originalEmp.isBlank()) {
+            String suffix = id.toString().replace("-", "");
+            String freed = "DEL-" + suffix.substring(0, Math.min(8, suffix.length())) + "-" + originalEmp;
+            entity.setEmployeeId(freed.length() > 32 ? freed.substring(0, 32) : freed);
         }
-        userRepository.deleteById(id);
+        userRepository.save(entity);
+        userRepository.delete(entity);
     }
 
     private UserDTO toDto(UserEntity entity) {

@@ -1,5 +1,6 @@
 package com.sentrifugo.rms.common.service;
 
+import com.sentrifugo.rms.common.util.IstTime;
 import com.sentrifugo.rms.db.entity.NotificationEntity;
 import com.sentrifugo.rms.db.entity.UserEntity;
 import com.sentrifugo.rms.db.enums.UserRole;
@@ -41,7 +42,7 @@ public class NotificationService {
     private final ObjectProvider<MailService> mailService;
 
     public LocalDateTime visibilityCutoff() {
-        return LocalDateTime.now().minusDays(VISIBLE_DAYS);
+        return IstTime.now().minusDays(VISIBLE_DAYS);
     }
 
     @Transactional(readOnly = true)
@@ -57,7 +58,7 @@ public class NotificationService {
 
     @Transactional
     public void markAllVisibleAsRead(UUID userId) {
-        notificationRepository.markUnreadAsRead(userId, visibilityCutoff(), LocalDateTime.now());
+        notificationRepository.markUnreadAsRead(userId, visibilityCutoff(), IstTime.now());
     }
 
     /** Fan-out to every Admin and Recruiter (not committee). Emails go out after commit, async. */

@@ -3,6 +3,7 @@ package com.sentrifugo.rms.common.exception;
 import com.sentrifugo.rms.common.dto.ApiResponse;
 import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
@@ -57,6 +58,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<ApiResponse<?>> handleAccessDenied(AccessDeniedException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error("Access denied"));
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<?>> handleDataIntegrity(DataIntegrityViolationException ex) {
+        String detail = ex.getMostSpecificCause() != null ? ex.getMostSpecificCause().getMessage() : ex.getMessage();
+        String lower = detail != null ? detail.toLowerCase() : "";
+        if (lower.contains("email") || lower.contains("users_email")
+                || (lower.contains("uk_") && lower.contains("email"))) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("A user with this email already exists."));
+        }
+        if (lower.contains("employee_id") || lower.contains("employeeid")) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("A user with this employee ID already exists."));
+        }
+        log.warn("Data integrity violation: {}", detail);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error("This record conflicts with existing data. Please check for duplicates."));
     }
 
     @ExceptionHandler(Exception.class)

@@ -279,6 +279,11 @@ public class InterviewSchedulingService {
             schedule.setAcceptToken(token);
             schedule.setInviteSentAt(now);
             schedule.setInviteRespondedAt(null);
+            UUID schedulerId = securityUtils.getCurrentUserId();
+            if (schedule.getCreatedBy() == null) {
+                schedule.setCreatedBy(schedulerId);
+            }
+            schedule.setModifiedBy(schedulerId);
             saved.add(interviewScheduleRepository.save(schedule));
             upsertRoundMeta(candidate.getId(), targetRound, roundName, slot);
 
@@ -1003,19 +1008,32 @@ public class InterviewSchedulingService {
 
     private void notifyRecruiterOfInviteDecision(InterviewScheduleEntity schedule, CandidateEntity candidate, boolean accepted) {
         try {
-            UUID recruiterId = schedule.getCreatedBy() != null ? schedule.getCreatedBy() : schedule.getModifiedBy();
-            if (recruiterId == null) {
-                return;
+            LinkedHashSet<UUID> ownerIds = new LinkedHashSet<>();
+            if (schedule.getCreatedBy() != null) {
+                ownerIds.add(schedule.getCreatedBy());
             }
-            UserEntity recruiter = userRepository.findById(recruiterId).orElse(null);
-            if (recruiter == null || recruiter.getEmail() == null || recruiter.getEmail().isBlank()) {
+            if (schedule.getModifiedBy() != null) {
+                ownerIds.add(schedule.getModifiedBy());
+            }
+            if (ownerIds.isEmpty()) {
+                log.warn("No recruiter owner on interview schedule {} — skipping invite-decision email", schedule.getId());
                 return;
             }
             String positionTitle = resolvePositionTitle(candidate);
             int round = schedule.getRound() != null ? schedule.getRound() : 1;
-            RmsEmailTemplates.BuiltEmail email = emailTemplates.recruiterInviteResponse(
-                    recruiter.getName(), candidate.getName(), positionTitle, round, schedule.getRoundName(), accepted);
-            emailTemplates.sendAsync(recruiter.getEmail(), email);
+            Set<String> sent = new HashSet<>();
+            for (UUID ownerId : ownerIds) {
+                UserEntity recruiter = userRepository.findById(ownerId).orElse(null);
+                if (recruiter == null || recruiter.getEmail() == null || recruiter.getEmail().isBlank()) {
+                    continue;
+                }
+                if (!sent.add(recruiter.getEmail().trim().toLowerCase())) {
+                    continue;
+                }
+                RmsEmailTemplates.BuiltEmail email = emailTemplates.recruiterInviteResponse(
+                        recruiter.getName(), candidate.getName(), positionTitle, round, schedule.getRoundName(), accepted);
+                emailTemplates.sendAsync(recruiter.getEmail(), email);
+            }
         } catch (Exception e) {
             log.warn("Failed to notify recruiter of invite decision: {}", e.getMessage());
         }

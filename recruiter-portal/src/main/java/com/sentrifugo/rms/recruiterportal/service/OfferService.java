@@ -31,8 +31,12 @@ import org.thymeleaf.spring6.SpringTemplateEngine;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.sentrifugo.rms.common.util.IstTime;
@@ -179,6 +183,9 @@ public class OfferService {
             if (offer.getStatus() != OfferStatus.GENERATED) {
                 throw new CommonException("Offer is not in a state that can be submitted for approval.");
             }
+            if (offer.getCreatedBy() == null) {
+                offer.setCreatedBy(currentUserId);
+            }
             offer.setStatus(OfferStatus.L1_PENDING);
             recordHistory(offer.getId(), currentUserId, actorName, OfferStatus.L1_PENDING.name(), null);
         }
@@ -237,20 +244,38 @@ public class OfferService {
         candidateOfferRepository.saveAll(offers);
 
         for (CandidateOfferEntity o : offers) {
-            UUID submitter = o.getCreatedBy();
+            List<UUID> owners = resolveOwnerRecipients(o);
             String label = "Offer letter";
             if (approver.getApproverRole() == ApproverRole.L1) {
                 if (o.getStatus() == OfferStatus.L2_PENDING) {
-                    notifyUsersAboutDecision(ApproverRole.L2, submitter, label, "L1", true, "Awaiting your L2 approval.");
+                    notifyUsersAboutDecision(ApproverRole.L2, owners, label, "L1", true, "Awaiting your L2 approval.");
                 } else if (o.getStatus() == OfferStatus.L1_REJECTED) {
-                    notifyUsersAboutDecision(null, submitter, label, "L1", false, "The offer was rejected at L1.");
+                    notifyUsersAboutDecision(null, owners, label, "L1", false, "The offer was rejected at L1.");
                 }
             } else if (o.getStatus() == OfferStatus.L2_REJECTED) {
-                notifyUsersAboutDecision(null, submitter, label, "L2", false, "The offer was rejected at L2.");
+                notifyUsersAboutDecision(null, owners, label, "L2", false, "The offer was rejected at L2.");
             } else if (o.getStatus() == OfferStatus.SENT) {
-                notifyUsersAboutDecision(null, submitter, label, "L2", true, "The offer was approved and emailed to the candidate.");
+                notifyUsersAboutDecision(null, owners, label, "L2", true, "The offer was approved and emailed to the candidate.");
             }
         }
+    }
+
+    /** Creator (offer generator) and/or submitter (latest L1_PENDING actor). Both when they differ. */
+    private List<UUID> resolveOwnerRecipients(CandidateOfferEntity offer) {
+        LinkedHashSet<UUID> ids = new LinkedHashSet<>();
+        if (offer.getCreatedBy() != null) {
+            ids.add(offer.getCreatedBy());
+        }
+        offerApprovalHistoryRepository.findByOfferIdOrderByCreatedDateDesc(offer.getId()).stream()
+                .filter(h -> OfferStatus.L1_PENDING.name().equals(h.getStatus()))
+                .map(OfferApprovalHistoryEntity::getApproverId)
+                .filter(id -> id != null)
+                .findFirst()
+                .ifPresent(ids::add);
+        if (ids.isEmpty() && offer.getModifiedBy() != null) {
+            ids.add(offer.getModifiedBy());
+        }
+        return List.copyOf(ids);
     }
 
     /** Approval history for the Offer Approvals history modal. */
@@ -393,10 +418,11 @@ public class OfferService {
             emailTemplates.sendAsync(candidate.getEmail(), toCandidate, true,
                     accept ? "offer-acceptance.pdf" : "offer-acknowledgement.pdf");
 
-            UUID recruiterId = offer.getCreatedBy() != null ? offer.getCreatedBy() : offer.getModifiedBy();
-            if (recruiterId != null) {
-                userRepository.findById(recruiterId).ifPresent(u -> {
-                    if (u.getEmail() != null && !u.getEmail().isBlank()) {
+            Set<String> sent = new HashSet<>();
+            for (UUID ownerId : resolveOwnerRecipients(offer)) {
+                userRepository.findById(ownerId).ifPresent(u -> {
+                    if (u.getEmail() != null && !u.getEmail().isBlank()
+                            && sent.add(u.getEmail().trim().toLowerCase())) {
                         emailTemplates.sendAsync(u.getEmail(),
                                 emailTemplates.recruiterOfferResponse(u.getName(), candidate.getName(), designation, accept));
                     }
@@ -489,26 +515,32 @@ public class OfferService {
         notifyApprover(ApproverRole.L2, itemLabel, "L2");
     }
 
-    private void notifyUsersAboutDecision(ApproverRole nextRoleOrNull, UUID submitterId, String itemLabel,
+    private void notifyUsersAboutDecision(ApproverRole nextRoleOrNull, Collection<UUID> ownerIds, String itemLabel,
                                           String decidedByLevel, boolean approved, String nextHint) {
         try {
+            Set<String> sentEmails = new HashSet<>();
             if (nextRoleOrNull != null) {
                 for (RequisitionApproverEntity approver : requisitionApproverRepository.findByApproverRole(nextRoleOrNull)) {
                     userRepository.findById(approver.getApproverId()).ifPresent(u -> {
-                        if (u.getEmail() != null) {
+                        if (u.getEmail() != null && sentEmails.add(u.getEmail().trim().toLowerCase())) {
                             emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
                                     u.getName(), "Offer letter", itemLabel, decidedByLevel, approved, nextHint));
                         }
                     });
                 }
             }
-            if (submitterId != null) {
-                userRepository.findById(submitterId).ifPresent(u -> {
-                    if (u.getEmail() != null) {
-                        emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
-                                u.getName(), "Offer letter", itemLabel, decidedByLevel, approved, nextHint));
+            if (ownerIds != null) {
+                for (UUID ownerId : ownerIds) {
+                    if (ownerId == null) {
+                        continue;
                     }
-                });
+                    userRepository.findById(ownerId).ifPresent(u -> {
+                        if (u.getEmail() != null && sentEmails.add(u.getEmail().trim().toLowerCase())) {
+                            emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
+                                    u.getName(), "Offer letter", itemLabel, decidedByLevel, approved, nextHint));
+                        }
+                    });
+                }
             }
         } catch (Exception e) {
             log.warn("Failed to send offer decision emails: {}", e.getMessage());

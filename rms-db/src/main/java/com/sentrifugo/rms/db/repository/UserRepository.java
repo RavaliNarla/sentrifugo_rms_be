@@ -16,6 +16,10 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     Optional<UserEntity> findByEmailIgnoreCase(String email);
 
+    /** Bypasses soft-delete @Where so we can reactivate or detect unique clashes. */
+    @Query(value = "SELECT * FROM hr.users WHERE LOWER(email) = LOWER(:email) LIMIT 1", nativeQuery = true)
+    Optional<UserEntity> findIncludingInactiveByEmailIgnoreCase(@Param("email") String email);
+
     Optional<UserEntity> findByEmployeeIdIgnoreCase(String employeeId);
 
     @Query("""

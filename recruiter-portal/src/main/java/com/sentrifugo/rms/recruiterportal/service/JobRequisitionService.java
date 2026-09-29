@@ -31,9 +31,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import com.sentrifugo.rms.common.util.IstTime;
@@ -193,6 +197,10 @@ public class JobRequisitionService {
             if (jobPositionRepository.findByRequisitionId(requisition.getId()).isEmpty()) {
                 throw new CommonException("Requisition '" + requisition.getTitle() + "' has no positions. Add at least one position before submitting.");
             }
+            // Stamp owning recruiter so reject/approve emails reach the submitter (not "first recruiter").
+            if (requisition.getCreatedBy() == null) {
+                requisition.setCreatedBy(currentUserId);
+            }
             requisition.setStatus(RequisitionStatus.L1_PENDING);
             recordHistory(requisition.getId(), currentUserId, actorName, RequisitionStatus.L1_PENDING.name(), null);
         }
@@ -248,18 +256,36 @@ public class JobRequisitionService {
 
         for (JobRequisitionEntity req : requisitions) {
             String label = req.getRequisitionCode() != null ? req.getRequisitionCode() : req.getTitle();
-            UUID submitter = req.getCreatedBy();
+            List<UUID> owners = resolveOwnerRecipients(req);
             if (approver.getApproverRole() == ApproverRole.L1) {
                 if (request.isApprove()) {
-                    notifyUsersAboutDecision(ApproverRole.L2, submitter, label, "L1", true, "Awaiting your L2 approval.");
+                    notifyUsersAboutDecision(ApproverRole.L2, owners, label, "L1", true, "Awaiting your L2 approval.");
                 } else {
-                    notifyUsersAboutDecision(null, submitter, label, "L1", false, "The requisition was rejected at L1.");
+                    notifyUsersAboutDecision(null, owners, label, "L1", false, "The requisition was rejected at L1.");
                 }
             } else {
-                notifyUsersAboutDecision(null, submitter, label, "L2", request.isApprove(),
+                notifyUsersAboutDecision(null, owners, label, "L2", request.isApprove(),
                         request.isApprove() ? "The requisition is now approved." : "The requisition was rejected at L2.");
             }
         }
+    }
+
+    /**
+     * Creator and/or submitter for ownership emails. When they differ, both are included (deduped).
+     * Submitter = most recent L1_PENDING history actor.
+     */
+    private List<UUID> resolveOwnerRecipients(JobRequisitionEntity req) {
+        LinkedHashSet<UUID> ids = new LinkedHashSet<>();
+        if (req.getCreatedBy() != null) {
+            ids.add(req.getCreatedBy());
+        }
+        approvalHistoryRepository.findByRequisitionIdOrderByCreatedDateDesc(req.getId()).stream()
+                .filter(h -> RequisitionStatus.L1_PENDING.name().equals(h.getStatus()))
+                .map(RequisitionApprovalHistoryEntity::getApproverId)
+                .filter(id -> id != null)
+                .findFirst()
+                .ifPresent(ids::add);
+        return List.copyOf(ids);
     }
 
     @Transactional
@@ -325,26 +351,32 @@ public class JobRequisitionService {
         notifyApprover(ApproverRole.L2, itemLabel, "L2");
     }
 
-    private void notifyUsersAboutDecision(ApproverRole nextRoleOrNull, UUID submitterId, String itemLabel,
+    private void notifyUsersAboutDecision(ApproverRole nextRoleOrNull, Collection<UUID> ownerIds, String itemLabel,
                                           String decidedByLevel, boolean approved, String nextHint) {
         try {
+            Set<String> sentEmails = new HashSet<>();
             if (nextRoleOrNull != null) {
                 for (RequisitionApproverEntity approver : requisitionApproverRepository.findByApproverRole(nextRoleOrNull)) {
                     userRepository.findById(approver.getApproverId()).ifPresent(u -> {
-                        if (u.getEmail() != null) {
+                        if (u.getEmail() != null && sentEmails.add(u.getEmail().trim().toLowerCase())) {
                             emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
                                     u.getName(), "Requisition", itemLabel, decidedByLevel, approved, nextHint));
                         }
                     });
                 }
             }
-            if (submitterId != null) {
-                userRepository.findById(submitterId).ifPresent(u -> {
-                    if (u.getEmail() != null) {
-                        emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
-                                u.getName(), "Requisition", itemLabel, decidedByLevel, approved, nextHint));
+            if (ownerIds != null) {
+                for (UUID ownerId : ownerIds) {
+                    if (ownerId == null) {
+                        continue;
                     }
-                });
+                    userRepository.findById(ownerId).ifPresent(u -> {
+                        if (u.getEmail() != null && sentEmails.add(u.getEmail().trim().toLowerCase())) {
+                            emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
+                                    u.getName(), "Requisition", itemLabel, decidedByLevel, approved, nextHint));
+                        }
+                    });
+                }
             }
         } catch (Exception e) {
             log.warn("Failed to send requisition decision emails: {}", e.getMessage());
