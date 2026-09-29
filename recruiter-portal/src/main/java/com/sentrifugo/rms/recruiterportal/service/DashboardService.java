@@ -117,7 +117,7 @@ public class DashboardService {
         int round = interviewScheduleRepository.findByCandidateId(c.getId())
                 .map(s -> s.getRound() != null ? s.getRound() : 1)
                 .orElse(1);
-        return "L" + round + " " + base;
+        return "R" + round + " " + base;
     }
 
     private DashboardDetailDTO offerDetails(String metric, String title, List<CandidateOfferEntity> list) {

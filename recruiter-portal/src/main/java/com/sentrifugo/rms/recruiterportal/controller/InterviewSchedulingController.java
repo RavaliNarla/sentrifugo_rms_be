@@ -2,6 +2,7 @@ package com.sentrifugo.rms.recruiterportal.controller;
 
 import com.sentrifugo.rms.common.dto.ApiResponse;
 import com.sentrifugo.rms.recruiterportal.dto.InterviewScheduleListItemDTO;
+import com.sentrifugo.rms.recruiterportal.dto.MultiDayScheduleRequest;
 import com.sentrifugo.rms.recruiterportal.dto.ScheduleInterviewRequest;
 import com.sentrifugo.rms.recruiterportal.service.InterviewSchedulingService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -33,10 +34,24 @@ public class InterviewSchedulingController {
         return ResponseEntity.ok(ApiResponse.ok(count, "Scheduled " + count + " candidate(s) for interview"));
     }
 
+    @Operation(summary = "Schedule one interview round across several days (all days saved or none)")
+    @PostMapping("/schedule-multi-day")
+    public ResponseEntity<ApiResponse<Integer>> scheduleMultiDay(@Valid @RequestBody MultiDayScheduleRequest request) {
+        int count = interviewSchedulingService.scheduleInterviewsMultiDay(request).size();
+        return ResponseEntity.ok(ApiResponse.ok(count, "Scheduled " + count + " candidate(s) for interview"));
+    }
+
     @Operation(summary = "Reschedule INVITE_SENT / SCHEDULED interviews (blocked if any scores exist)")
     @PostMapping("/reschedule")
     public ResponseEntity<ApiResponse<Integer>> reschedule(@Valid @RequestBody ScheduleInterviewRequest request) {
         int count = interviewSchedulingService.rescheduleInterviews(request).size();
+        return ResponseEntity.ok(ApiResponse.ok(count, "Rescheduled " + count + " candidate(s)"));
+    }
+
+    @Operation(summary = "Reschedule one round's interviews across several days (all days saved or none)")
+    @PostMapping("/reschedule-multi-day")
+    public ResponseEntity<ApiResponse<Integer>> rescheduleMultiDay(@Valid @RequestBody MultiDayScheduleRequest request) {
+        int count = interviewSchedulingService.rescheduleInterviewsMultiDay(request).size();
         return ResponseEntity.ok(ApiResponse.ok(count, "Rescheduled " + count + " candidate(s)"));
     }
 

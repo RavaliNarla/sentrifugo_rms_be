@@ -48,12 +48,29 @@ public class InterviewPoolService {
     private final InterviewRoundMetaRepository interviewRoundMetaRepository;
     private final SecurityUtils securityUtils;
 
-    public Page<InterviewScheduleDTO> getInterviewPool(UUID positionId, List<CandidateStatus> statuses, String searchText, int page, int size) {
-        List<CandidateStatus> effectiveStatuses = statuses != null && !statuses.isEmpty() ? statuses :
-                List.of(CandidateStatus.INVITE_SENT, CandidateStatus.SCHEDULED, CandidateStatus.DECLINED,
-                        CandidateStatus.QUALIFIED, CandidateStatus.DISQUALIFIED);
-        Page<CandidateEntity> candidatesPage = candidateRepository.search(positionId, effectiveStatuses, searchText, PageRequest.of(page, size));
+    private static final List<CandidateStatus> INTERVIEW_POOL_STATUSES =
+            List.of(CandidateStatus.INVITE_SENT, CandidateStatus.SCHEDULED, CandidateStatus.DECLINED,
+                    CandidateStatus.QUALIFIED, CandidateStatus.DISQUALIFIED);
+
+    /** round = optional round filter (R1, R2, ...); null = all rounds. */
+    public Page<InterviewScheduleDTO> getInterviewPool(UUID positionId, List<CandidateStatus> statuses, Integer round,
+                                                       String searchText, int page, int size) {
+        List<CandidateStatus> effectiveStatuses = statuses != null && !statuses.isEmpty() ? statuses : INTERVIEW_POOL_STATUSES;
+        PageRequest pageRequest = PageRequest.of(page, size);
+        Page<CandidateEntity> candidatesPage = round == null
+                ? candidateRepository.search(positionId, effectiveStatuses, searchText, pageRequest)
+                : candidateRepository.searchByRound(positionId, effectiveStatuses, searchText, round, pageRequest);
         return candidatesPage.map(c -> toDto(c, null, true));
+    }
+
+    /** Levels (rounds) present in this position's Interview Pool, ascending - always includes 1. */
+    public List<Integer> getInterviewPoolRounds(UUID positionId) {
+        java.util.TreeSet<Integer> rounds = new java.util.TreeSet<>();
+        interviewScheduleRepository.findRoundsForPosition(positionId, INTERVIEW_POOL_STATUSES).stream()
+                .filter(java.util.Objects::nonNull)
+                .forEach(rounds::add);
+        rounds.add(1);
+        return List.copyOf(rounds);
     }
 
     /** Candidates who accepted (or are already in scoring) for the logged-in interviewer's panel(s). */

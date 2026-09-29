@@ -28,6 +28,21 @@ public interface CandidateRepository extends JpaRepository<CandidateEntity, UUID
                                   @Param("searchText") String searchText,
                                   Pageable pageable);
 
+    /** Interview Pool level filter (e.g. "L2 SCHEDULED"): same as search, limited to one interview round. */
+    @Query("""
+        SELECT c FROM CandidateEntity c
+        WHERE c.positionId = :positionId
+          AND (:statuses IS NULL OR c.status IN :statuses)
+          AND (:searchText IS NULL OR :searchText = '' OR LOWER(c.name) LIKE LOWER(CONCAT('%', :searchText, '%')))
+          AND EXISTS (SELECT 1 FROM InterviewScheduleEntity s WHERE s.candidateId = c.id AND s.round = :round)
+        ORDER BY c.createdDate DESC
+        """)
+    Page<CandidateEntity> searchByRound(@Param("positionId") UUID positionId,
+                                        @Param("statuses") List<CandidateStatus> statuses,
+                                        @Param("searchText") String searchText,
+                                        @Param("round") Integer round,
+                                        Pageable pageable);
+
     // Offer Pool status filter: candidates whose offer is in a given status...
     @Query("""
         SELECT c FROM CandidateEntity c

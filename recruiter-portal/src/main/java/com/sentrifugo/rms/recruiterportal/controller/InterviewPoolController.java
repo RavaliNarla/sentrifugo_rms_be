@@ -29,14 +29,22 @@ public class InterviewPoolController {
     public ResponseEntity<ApiResponse<Page<InterviewScheduleDTO>>> search(
             @RequestParam UUID positionId,
             @RequestParam(required = false) List<String> statuses,
+            @RequestParam(required = false) Integer round,
             @RequestParam(required = false, defaultValue = "") String searchText,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         List<CandidateStatus> statusList = statuses == null || statuses.isEmpty() ? null :
                 statuses.stream().map(CandidateStatus::valueOf).toList();
         return ResponseEntity.ok(ApiResponse.ok(
-                interviewPoolService.getInterviewPool(positionId, statusList, searchText, page, size),
+                interviewPoolService.getInterviewPool(positionId, statusList, round, searchText, page, size),
                 "Interview pool fetched successfully"));
+    }
+
+    @Operation(summary = "Interview rounds (R1, R2, ...) present in a position's Interview Pool - for the status filter")
+    @GetMapping("/rounds")
+    public ResponseEntity<ApiResponse<List<Integer>>> rounds(@RequestParam UUID positionId) {
+        return ResponseEntity.ok(ApiResponse.ok(interviewPoolService.getInterviewPoolRounds(positionId),
+                "Interview rounds fetched successfully"));
     }
 
     @Operation(summary = "Requisitions that have interviews scheduled on the current interviewer's panel(s) - for the Interviewer Schedule dropdown")

@@ -19,11 +19,30 @@ import java.util.UUID;
 public interface InterviewScheduleRepository extends JpaRepository<InterviewScheduleEntity, UUID> {
     Optional<InterviewScheduleEntity> findByCandidateId(UUID candidateId);
     List<InterviewScheduleEntity> findByCandidateIdIn(List<UUID> candidateIds);
+
+    /**
+     * Includes soft-deleted (cancelled) rows, bypassing @Where. candidate_id is unique, so
+     * re-scheduling a cancelled candidate must reuse that row instead of inserting a new one.
+     */
+    @Query(value = "SELECT * FROM recruitment.interview_schedule WHERE candidate_id = :candidateId",
+            nativeQuery = true)
+    Optional<InterviewScheduleEntity> findAnyByCandidateId(@Param("candidateId") UUID candidateId);
     List<InterviewScheduleEntity> findByPanelIdAndInterviewDate(UUID panelId, LocalDate interviewDate);
 
     List<InterviewScheduleEntity> findByPanelIdInAndInterviewDate(Collection<UUID> panelIds, LocalDate interviewDate);
 
     Optional<InterviewScheduleEntity> findByAcceptToken(UUID acceptToken);
+
+    /** Interview rounds (levels) in use for a position's candidates in the given statuses - drives the L1/L2 filter. */
+    @Query("""
+            SELECT DISTINCT s.round FROM InterviewScheduleEntity s, CandidateEntity c
+            WHERE c.id = s.candidateId
+              AND c.positionId = :positionId
+              AND c.status IN :statuses
+            ORDER BY s.round
+            """)
+    List<Integer> findRoundsForPosition(@Param("positionId") UUID positionId,
+                                        @Param("statuses") Collection<CandidateStatus> statuses);
 
     boolean existsBySupersededTokensContaining(String token);
 

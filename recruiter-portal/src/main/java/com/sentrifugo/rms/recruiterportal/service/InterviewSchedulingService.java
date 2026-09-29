@@ -9,6 +9,7 @@ import com.sentrifugo.rms.db.entity.*;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
 import com.sentrifugo.rms.db.repository.*;
 import com.sentrifugo.rms.recruiterportal.dto.InterviewScheduleListItemDTO;
+import com.sentrifugo.rms.recruiterportal.dto.MultiDayScheduleRequest;
 import com.sentrifugo.rms.recruiterportal.dto.ScheduleInterviewRequest;
 import com.sentrifugo.rms.recruiterportal.util.IcsCalendarBuilder;
 import lombok.RequiredArgsConstructor;
@@ -67,9 +68,86 @@ public class InterviewSchedulingService {
     private record Slot(UUID panelId, LocalDate date, LocalTime start, LocalTime end, int duration) {
     }
 
+    /** Current round / slots of the candidates being rescheduled (read before anything is moved). */
+    private record RescheduleContext(int round, String roundName, Set<UUID> oldPanelIds, Set<LocalDate> oldDates) {
+    }
+
     @Transactional
     public List<InterviewScheduleEntity> scheduleInterviews(ScheduleInterviewRequest request) {
-        return scheduleInterviewsInternal(request, false);
+        return scheduleInterviewsInternal(request, false, Set.of());
+    }
+
+    /**
+     * Schedule Interviews page: same round across several days. Each day reuses the single-day
+     * logic; one transaction, so any failing day rolls back all days (invite emails are only
+     * sent after commit).
+     */
+    @Transactional
+    public List<InterviewScheduleEntity> scheduleInterviewsMultiDay(MultiDayScheduleRequest request) {
+        assertValidDays(request.getDays());
+        return saveDays(request.getDays(), request.getRound(), request.getRoundName(), false);
+    }
+
+    /**
+     * Schedule Interviews page in reschedule mode: move INVITE_SENT / SCHEDULED interviews of one
+     * round across one or more days. All days are validated up front and saved in one transaction.
+     */
+    @Transactional
+    public List<InterviewScheduleEntity> rescheduleInterviewsMultiDay(MultiDayScheduleRequest request) {
+        assertValidDays(request.getDays());
+        List<UUID> allIds = request.getDays().stream()
+                .flatMap(d -> d.getCandidateIds().stream())
+                .toList();
+        List<CandidateEntity> candidates = candidateRepository.findByIdIn(allIds);
+        if (candidates.size() != allIds.size()) {
+            throw new CommonException("One or more candidates were not found.");
+        }
+        RescheduleContext ctx = validateReschedule(candidates);
+        String roundName = request.getRoundName() == null || request.getRoundName().isBlank()
+                ? ctx.roundName() : request.getRoundName();
+        List<InterviewScheduleEntity> saved = saveDays(request.getDays(), ctx.round(), roundName, true);
+        refreshOldDayNotifications(ctx);
+        return saved;
+    }
+
+    /** Each candidate on one day only; one panel used at most once per date. */
+    private void assertValidDays(List<ScheduleInterviewRequest> days) {
+        Set<UUID> seenCandidates = new HashSet<>();
+        Set<String> seenPanelDates = new HashSet<>();
+        for (int i = 0; i < days.size(); i++) {
+            ScheduleInterviewRequest day = days.get(i);
+            for (UUID candidateId : day.getCandidateIds()) {
+                if (!seenCandidates.add(candidateId)) {
+                    throw new CommonException("A candidate is assigned to more than one day. Assign each candidate to one day only.");
+                }
+            }
+            if (!seenPanelDates.add(day.getPanelId() + "|" + day.getInterviewDate())) {
+                throw new CommonException("Day " + (i + 1)
+                        + ": the same panel is already used on this date in another day. Merge them into one day.");
+            }
+        }
+    }
+
+    private List<InterviewScheduleEntity> saveDays(List<ScheduleInterviewRequest> days, Integer round,
+                                                   String roundName, boolean reschedule) {
+        List<InterviewScheduleEntity> saved = new ArrayList<>();
+        for (int i = 0; i < days.size(); i++) {
+            ScheduleInterviewRequest day = days.get(i);
+            day.setRound(round);
+            day.setRoundName(roundName);
+            // Candidates of this and later days still hold their old slots - those must not block
+            // this day. Earlier days are already moved, so their new slots are checked normally.
+            Set<UUID> notYetMoved = days.subList(i + 1, days.size()).stream()
+                    .flatMap(d -> d.getCandidateIds().stream())
+                    .collect(Collectors.toSet());
+            try {
+                saved.addAll(scheduleInterviewsInternal(day, reschedule, reschedule ? notYetMoved : Set.of()));
+            } catch (CommonException e) {
+                throw new CommonException("Day " + (i + 1) + " (" + day.getInterviewDate().format(DATE_FMT) + "): "
+                        + e.getMessage());
+            }
+        }
+        return saved;
     }
 
     /**
@@ -78,7 +156,32 @@ public class InterviewSchedulingService {
      */
     @Transactional
     public List<InterviewScheduleEntity> rescheduleInterviews(ScheduleInterviewRequest request) {
-        List<CandidateEntity> candidates = loadOrderedCandidates(request);
+        RescheduleContext ctx = validateReschedule(loadOrderedCandidates(request));
+        request.setRound(ctx.round());
+        if ((request.getRoundName() == null || request.getRoundName().isBlank()) && ctx.roundName() != null) {
+            request.setRoundName(ctx.roundName());
+        }
+        List<InterviewScheduleEntity> saved = scheduleInterviewsInternal(request, true, Set.of());
+        refreshOldDayNotifications(ctx);
+        return saved;
+    }
+
+    /** Old panel/day interview counts changed - refresh those members' day notifications. */
+    private void refreshOldDayNotifications(RescheduleContext ctx) {
+        UUID schedulerId = securityUtils.getCurrentUserId();
+        for (UUID panelId : ctx.oldPanelIds()) {
+            for (LocalDate date : ctx.oldDates()) {
+                List<InterviewPanelMemberEntity> members = interviewPanelMemberRepository.findByPanelId(panelId);
+                for (InterviewPanelMemberEntity member : members) {
+                    int dayCount = countActiveInterviewsForMember(member.getUserId(), date);
+                    notificationService.upsertCommitteeInterviewDay(
+                            member.getUserId(), date, dayCount, false, schedulerId);
+                }
+            }
+        }
+    }
+
+    private RescheduleContext validateReschedule(List<CandidateEntity> candidates) {
         Integer sharedRound = null;
         String sharedRoundName = null;
         Set<UUID> oldPanelIds = new HashSet<>();
@@ -105,26 +208,15 @@ public class InterviewSchedulingService {
                 oldDates.add(existing.getInterviewDate());
             }
         }
-        request.setRound(sharedRound);
-        if ((request.getRoundName() == null || request.getRoundName().isBlank()) && sharedRoundName != null) {
-            request.setRoundName(sharedRoundName);
-        }
-        List<InterviewScheduleEntity> saved = scheduleInterviewsInternal(request, true);
-        UUID schedulerId = securityUtils.getCurrentUserId();
-        for (UUID panelId : oldPanelIds) {
-            for (LocalDate date : oldDates) {
-                List<InterviewPanelMemberEntity> members = interviewPanelMemberRepository.findByPanelId(panelId);
-                for (InterviewPanelMemberEntity member : members) {
-                    int dayCount = countActiveInterviewsForMember(member.getUserId(), date);
-                    notificationService.upsertCommitteeInterviewDay(
-                            member.getUserId(), date, dayCount, false, schedulerId);
-                }
-            }
-        }
-        return saved;
+        return new RescheduleContext(sharedRound, sharedRoundName, oldPanelIds, oldDates);
     }
 
-    private List<InterviewScheduleEntity> scheduleInterviewsInternal(ScheduleInterviewRequest request, boolean reschedule) {
+    /**
+     * @param ignoreSlotsOf candidates (besides this day's) whose current slots must not count as
+     *                      conflicts - used when a multi-day reschedule moves them on a later day.
+     */
+    private List<InterviewScheduleEntity> scheduleInterviewsInternal(ScheduleInterviewRequest request, boolean reschedule,
+                                                                     Set<UUID> ignoreSlotsOf) {
         int duration = request.getDurationMinutes() != null ? request.getDurationMinutes() : DEFAULT_DURATION_MINUTES;
         if (duration <= 0) {
             throw new CommonException("Interview duration must be greater than 0 minutes.");
@@ -153,7 +245,8 @@ public class InterviewSchedulingService {
                     + " candidate(s). Extend the time window, shorten duration, remove/shorten breaks, or select fewer candidates.");
         }
 
-        Set<UUID> candidateIds = candidates.stream().map(CandidateEntity::getId).collect(Collectors.toSet());
+        Set<UUID> candidateIds = candidates.stream().map(CandidateEntity::getId).collect(Collectors.toCollection(HashSet::new));
+        candidateIds.addAll(ignoreSlotsOf);
         assertNoMemberConflicts(request.getPanelId(), request.getInterviewDate(),
                 slots.subList(0, candidates.size()), candidateIds);
         assertNoInternalOverlaps(slots.subList(0, candidates.size()));
@@ -167,8 +260,10 @@ public class InterviewSchedulingService {
             CandidateEntity candidate = candidates.get(i);
             Slot slot = slots.get(i);
 
-            InterviewScheduleEntity schedule = interviewScheduleRepository.findByCandidateId(candidate.getId())
+            // Reuse the candidate's row even if an earlier interview was cancelled (soft-deleted).
+            InterviewScheduleEntity schedule = interviewScheduleRepository.findAnyByCandidateId(candidate.getId())
                     .orElse(InterviewScheduleEntity.builder().candidateId(candidate.getId()).build());
+            schedule.setIsActive(true);
             archiveAcceptToken(schedule);
             UUID token = UUID.randomUUID();
             schedule.setPanelId(slot.panelId());
