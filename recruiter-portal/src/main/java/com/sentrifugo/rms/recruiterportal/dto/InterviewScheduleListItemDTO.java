@@ -29,4 +29,5 @@ public class InterviewScheduleListItemDTO {
     private String positionTitleName;
     private String locationName;
     private Integer round;
+    private String roundName;
 }

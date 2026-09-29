@@ -18,5 +18,7 @@ public enum CandidateStatus {
     QUALIFIED,
     DISQUALIFIED,
     COMPENSATION_PENDING,
+    /** Compensation details saved; eligible to move to Offer Pool. */
+    COMPENSATION_SUBMITTED,
     MOVED_TO_OFFER
 }

@@ -1,9 +1,13 @@
 package com.sentrifugo.rms.common.util;
 
+import com.sentrifugo.rms.db.entity.InterviewPanelMemberEntity;
 import com.sentrifugo.rms.db.entity.RequisitionApproverEntity;
 import com.sentrifugo.rms.db.entity.UserEntity;
 import com.sentrifugo.rms.db.enums.ApproverRole;
 import com.sentrifugo.rms.db.enums.UserRole;
+import com.sentrifugo.rms.db.repository.InterviewPanelMemberRepository;
+import com.sentrifugo.rms.db.repository.InterviewRoundMetaRepository;
+import com.sentrifugo.rms.db.repository.InterviewScheduleRepository;
 import com.sentrifugo.rms.db.repository.RequisitionApproverRepository;
 import com.sentrifugo.rms.db.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -11,6 +15,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,6 +26,9 @@ public class SecurityUtils {
 
     private final UserRepository userRepository;
     private final RequisitionApproverRepository requisitionApproverRepository;
+    private final InterviewPanelMemberRepository interviewPanelMemberRepository;
+    private final InterviewScheduleRepository interviewScheduleRepository;
+    private final InterviewRoundMetaRepository interviewRoundMetaRepository;
 
     public UUID getCurrentUserId() {
         Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
@@ -71,6 +79,10 @@ public class SecurityUtils {
             privileges.put("OfferPool", true);
             privileges.put("CommitteeManagement", true);
             privileges.put("Dashboard", true);
+            // Once scheduled on a panel (live or historical), recruiter keeps My Interview Schedule.
+            if (hasInterviewScheduleAccess(userId)) {
+                privileges.put("Interview", true);
+            }
         } else if (role == UserRole.COMMITTEE_MEMBER) {
             privileges.put("Interview", true);
         }
@@ -86,5 +98,20 @@ public class SecurityUtils {
         }
 
         return privileges;
+    }
+
+    /** True when the user belongs to any panel that has (or had) an interview scheduled. */
+    private boolean hasInterviewScheduleAccess(UUID userId) {
+        List<UUID> panelIds = interviewPanelMemberRepository.findByUserId(userId).stream()
+                .map(InterviewPanelMemberEntity::getPanelId)
+                .distinct()
+                .toList();
+        for (UUID panelId : panelIds) {
+            if (interviewScheduleRepository.existsByPanelId(panelId)
+                    || interviewRoundMetaRepository.existsByPanelId(panelId)) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -206,7 +206,8 @@ public class JobRequisitionService {
             notificationService.notifyAdminsAndRecruiters(
                     NotificationService.TYPE_REQUISITION_SUBMITTED,
                     "New requisition submitted for approval: " + code
-                            + " — " + positionCount + " position" + (positionCount == 1 ? "" : "s") + ".");
+                            + " — " + positionCount + " position" + (positionCount == 1 ? "" : "s") + ".",
+                    currentUserId);
         }
     }
 

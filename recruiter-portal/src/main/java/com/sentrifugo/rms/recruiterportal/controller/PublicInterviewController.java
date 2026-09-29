@@ -67,6 +67,11 @@ public class PublicInterviewController {
                 message = "A newer interview invite has been sent. Please use the Accept / Decline links in the most recent email.";
                 color = "#888888";
             }
+            case "EXPIRED" -> {
+                title = "Invite Expired";
+                message = "This interview invite link is no longer valid — responses are only accepted before the interview day.";
+                color = "#888888";
+            }
             default -> {
                 title = "Invalid Link";
                 message = "This interview invite link is invalid or no longer exists.";

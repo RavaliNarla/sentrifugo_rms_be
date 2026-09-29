@@ -21,6 +21,11 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CompensationService {
 
+    private static final List<CandidateStatus> COMPENSATION_POOL_STATUSES = List.of(
+            CandidateStatus.COMPENSATION_PENDING,
+            CandidateStatus.COMPENSATION_SUBMITTED
+    );
+
     private final CandidateRepository candidateRepository;
 
     @Transactional
@@ -39,7 +44,8 @@ public class CompensationService {
     public void updateCompensationDetails(UUID candidateId, CompensationDetailsRequest request) {
         CandidateEntity candidate = candidateRepository.findById(candidateId)
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
-        if (candidate.getStatus() != CandidateStatus.COMPENSATION_PENDING) {
+        if (candidate.getStatus() != CandidateStatus.COMPENSATION_PENDING
+                && candidate.getStatus() != CandidateStatus.COMPENSATION_SUBMITTED) {
             throw new CommonException("Candidate is not in Compensation Management.");
         }
         candidate.setCurrentCtc(request.getCurrentCtc());
@@ -49,6 +55,7 @@ public class CompensationService {
         candidate.setBonus(request.getBonus());
         candidate.setCompensationComments(request.getCompensationComments());
         candidate.setAgreedCtc(request.getAgreedCtc());
+        candidate.setStatus(CandidateStatus.COMPENSATION_SUBMITTED);
         candidateRepository.save(candidate);
     }
 
@@ -56,8 +63,9 @@ public class CompensationService {
     public void moveToOffer(List<UUID> candidateIds) {
         List<CandidateEntity> candidates = candidateRepository.findByIdIn(candidateIds);
         for (CandidateEntity candidate : candidates) {
-            if (candidate.getStatus() != CandidateStatus.COMPENSATION_PENDING) {
-                throw new CommonException("Candidate '" + candidate.getName() + "' is not in Compensation Management.");
+            if (candidate.getStatus() != CandidateStatus.COMPENSATION_SUBMITTED) {
+                throw new CommonException("Candidate '" + candidate.getName()
+                        + "' must have compensation details saved (Compensation Submitted) before moving to Offer Pool.");
             }
             if (candidate.getAgreedCtc() == null) {
                 throw new CommonException("Candidate '" + candidate.getName() + "' has no Agreed CTC entered.");
@@ -69,7 +77,7 @@ public class CompensationService {
 
     public Page<CandidateDTO> getCompensationPool(UUID positionId, String searchText, int page, int size) {
         Page<CandidateEntity> result = candidateRepository.search(positionId,
-                List.of(CandidateStatus.COMPENSATION_PENDING), searchText, PageRequest.of(page, size));
+                COMPENSATION_POOL_STATUSES, searchText, PageRequest.of(page, size));
         return result.map(this::toDto);
     }
 

@@ -52,8 +52,7 @@ public class NotificationService {
 
     @Transactional(readOnly = true)
     public long countUnread(UUID userId) {
-        return notificationRepository.countByUserIdAndReadAtIsNullAndCreatedDateGreaterThanEqual(
-                userId, visibilityCutoff());
+        return notificationRepository.countUnreadExcludingSelfSourced(userId, visibilityCutoff());
     }
 
     @Transactional
@@ -64,6 +63,15 @@ public class NotificationService {
     /** Fan-out to every Admin and Recruiter (not committee). Emails go out after commit, async. */
     @Transactional
     public void notifyAdminsAndRecruiters(String type, String message) {
+        notifyAdminsAndRecruiters(type, message, null);
+    }
+
+    /**
+     * @param sourceUserId actor who caused the event — their own bell badge stays unchanged
+     *                     (notification row is still created for the feed).
+     */
+    @Transactional
+    public void notifyAdminsAndRecruiters(String type, String message, UUID sourceUserId) {
         List<UserEntity> recipients = userRepository.findByRoleIn(List.of(
                 UserRole.ADMIN.getValue(),
                 UserRole.RECRUITER.getValue()));
@@ -80,7 +88,9 @@ public class NotificationService {
                     .type(type)
                     .message(message)
                     .interviewCount(0)
+                    .sourceUserId(sourceUserId)
                     .build());
+            // Still email the actor; only the unread badge is suppressed.
             emails.add(new PendingEmail(user.getEmail(), user.getName(), subject, message));
         }
         notificationRepository.saveAll(rows);
@@ -88,12 +98,12 @@ public class NotificationService {
     }
 
     /**
-     * One notification per committee member per interview date. Re-schedules the same day
-     * refresh the count/message and re-mark unread.
+     * One notification per panel member (committee or recruiter) per interview date.
+     * Re-schedules the same day refresh the count/message and re-mark unread.
      */
     @Transactional
     public void upsertCommitteeInterviewDay(UUID userId, LocalDate interviewDate, int dayInterviewCount) {
-        upsertCommitteeInterviewDay(userId, interviewDate, dayInterviewCount, true);
+        upsertCommitteeInterviewDay(userId, interviewDate, dayInterviewCount, true, null);
     }
 
     /**
@@ -101,6 +111,12 @@ public class NotificationService {
      */
     @Transactional
     public void upsertCommitteeInterviewDay(UUID userId, LocalDate interviewDate, int dayInterviewCount, boolean sendEmail) {
+        upsertCommitteeInterviewDay(userId, interviewDate, dayInterviewCount, sendEmail, null);
+    }
+
+    @Transactional
+    public void upsertCommitteeInterviewDay(UUID userId, LocalDate interviewDate, int dayInterviewCount,
+                                            boolean sendEmail, UUID sourceUserId) {
         if (userId == null || interviewDate == null) {
             return;
         }
@@ -128,6 +144,9 @@ public class NotificationService {
             existing.setInterviewCount(dayInterviewCount);
             existing.setMessage(message);
             existing.setReadAt(null);
+            if (sourceUserId != null) {
+                existing.setSourceUserId(sourceUserId);
+            }
             notificationRepository.save(existing);
         } else {
             notificationRepository.save(NotificationEntity.builder()
@@ -136,6 +155,7 @@ public class NotificationService {
                     .message(message)
                     .referenceDate(interviewDate)
                     .interviewCount(dayInterviewCount)
+                    .sourceUserId(sourceUserId)
                     .build());
         }
         if (sendEmail) {

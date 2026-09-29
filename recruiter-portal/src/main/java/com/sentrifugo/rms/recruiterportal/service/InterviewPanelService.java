@@ -7,6 +7,7 @@ import com.sentrifugo.rms.db.entity.InterviewPanelMemberEntity;
 import com.sentrifugo.rms.db.entity.UserEntity;
 import com.sentrifugo.rms.db.repository.InterviewPanelMemberRepository;
 import com.sentrifugo.rms.db.repository.InterviewPanelRepository;
+import com.sentrifugo.rms.db.repository.InterviewRoundMetaRepository;
 import com.sentrifugo.rms.db.repository.InterviewScheduleRepository;
 import com.sentrifugo.rms.db.repository.UserRepository;
 import com.sentrifugo.rms.recruiterportal.dto.InterviewPanelDTO;
@@ -19,7 +20,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -32,12 +35,14 @@ public class InterviewPanelService {
     private final InterviewPanelMemberRepository interviewPanelMemberRepository;
     private final UserRepository userRepository;
     private final InterviewScheduleRepository interviewScheduleRepository;
+    private final InterviewRoundMetaRepository interviewRoundMetaRepository;
 
     @Transactional
     public InterviewPanelDTO create(InterviewPanelDTO dto) {
         if (interviewPanelRepository.existsByNameIgnoreCase(dto.getName())) {
             throw new CommonException("A panel with this name already exists.");
         }
+        assertHomogeneousMemberRoles(dto.getMemberIds());
         rejectIfDuplicateMemberSet(dto.getMemberIds(), null);
         InterviewPanelEntity panel = interviewPanelRepository.save(InterviewPanelEntity.builder().name(dto.getName()).build());
         saveMembers(panel.getId(), dto.getMemberIds());
@@ -48,12 +53,36 @@ public class InterviewPanelService {
     public InterviewPanelDTO update(UUID id, InterviewPanelDTO dto) {
         InterviewPanelEntity panel = interviewPanelRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Panel not found"));
+        if (panelHasSchedules(id)) {
+            throw new CommonException("Cannot edit a panel that already has interview schedules.");
+        }
+        assertHomogeneousMemberRoles(dto.getMemberIds());
         rejectIfDuplicateMemberSet(dto.getMemberIds(), id);
         panel.setName(dto.getName());
         interviewPanelRepository.save(panel);
         interviewPanelMemberRepository.deleteByPanelId(id);
         saveMembers(id, dto.getMemberIds());
         return toDto(panel);
+    }
+
+    /** Panels are recruiter-only or committee-only — never mixed (corporate scoring separation). */
+    private void assertHomogeneousMemberRoles(List<UUID> memberIds) {
+        if (memberIds == null || memberIds.isEmpty()) {
+            return;
+        }
+        List<UserEntity> users = userRepository.findAllById(memberIds);
+        if (users.size() != memberIds.stream().distinct().count()) {
+            throw new CommonException("One or more selected panel members were not found.");
+        }
+        Set<String> roles = users.stream()
+                .map(UserEntity::getRole)
+                .filter(Objects::nonNull)
+                .map(r -> r.trim().toLowerCase(Locale.ROOT))
+                .collect(Collectors.toSet());
+        if (roles.size() > 1) {
+            throw new CommonException(
+                    "A panel must contain only Recruiters or only Committee Members — mixed roles are not allowed.");
+        }
     }
 
     // SCL: block creating/renaming a panel to have the exact same member set as an existing
@@ -88,11 +117,16 @@ public class InterviewPanelService {
 
     @Transactional
     public void delete(UUID id) {
-        if (interviewScheduleRepository.existsByPanelId(id)) {
+        if (panelHasSchedules(id)) {
             throw new CommonException("Cannot delete a panel that already has interview schedules.");
         }
         interviewPanelMemberRepository.deleteByPanelId(id);
         interviewPanelRepository.deleteById(id);
+    }
+
+    private boolean panelHasSchedules(UUID panelId) {
+        return interviewScheduleRepository.existsByPanelId(panelId)
+                || interviewRoundMetaRepository.existsByPanelId(panelId);
     }
 
     public List<InterviewPanelDTO> getAll() {
@@ -124,6 +158,7 @@ public class InterviewPanelService {
                 .name(panel.getName())
                 .memberIds(members.stream().map(InterviewPanelMemberEntity::getUserId).collect(Collectors.toList()))
                 .memberNames(members.stream().map(m -> userNames.get(m.getUserId())).collect(Collectors.toList()))
+                .hasSchedules(panelHasSchedules(panel.getId()))
                 .build();
     }
 }

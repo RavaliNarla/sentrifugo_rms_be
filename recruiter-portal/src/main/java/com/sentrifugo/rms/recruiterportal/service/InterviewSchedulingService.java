@@ -4,6 +4,7 @@ import com.sentrifugo.rms.common.exception.CommonException;
 import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
 import com.sentrifugo.rms.common.service.MailService;
 import com.sentrifugo.rms.common.service.NotificationService;
+import com.sentrifugo.rms.common.util.SecurityUtils;
 import com.sentrifugo.rms.db.entity.*;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
 import com.sentrifugo.rms.db.repository.*;
@@ -56,6 +57,9 @@ public class InterviewSchedulingService {
     private final UserRepository userRepository;
     private final MailService mailService;
     private final NotificationService notificationService;
+    private final InterviewRoundMetaRepository interviewRoundMetaRepository;
+    private final PanelMemberScoreRepository panelMemberScoreRepository;
+    private final SecurityUtils securityUtils;
 
     @Value("${app.base.url}")
     private String appBaseUrl;
@@ -65,6 +69,62 @@ public class InterviewSchedulingService {
 
     @Transactional
     public List<InterviewScheduleEntity> scheduleInterviews(ScheduleInterviewRequest request) {
+        return scheduleInterviewsInternal(request, false);
+    }
+
+    /**
+     * Reschedule existing INVITE_SENT / SCHEDULED interviews (same round). Blocked once any
+     * panel member has scored that round.
+     */
+    @Transactional
+    public List<InterviewScheduleEntity> rescheduleInterviews(ScheduleInterviewRequest request) {
+        List<CandidateEntity> candidates = loadOrderedCandidates(request);
+        Integer sharedRound = null;
+        String sharedRoundName = null;
+        Set<UUID> oldPanelIds = new HashSet<>();
+        Set<LocalDate> oldDates = new HashSet<>();
+        for (CandidateEntity candidate : candidates) {
+            if (candidate.getStatus() != CandidateStatus.INVITE_SENT
+                    && candidate.getStatus() != CandidateStatus.SCHEDULED) {
+                throw new CommonException("Candidate '" + candidate.getName()
+                        + "' must be Invite Sent or Scheduled to reschedule.");
+            }
+            InterviewScheduleEntity existing = interviewScheduleRepository.findByCandidateId(candidate.getId())
+                    .orElseThrow(() -> new CommonException("Candidate '" + candidate.getName()
+                            + "' has no interview schedule to reschedule."));
+            int round = existing.getRound() != null ? existing.getRound() : 1;
+            if (sharedRound == null) {
+                sharedRound = round;
+                sharedRoundName = existing.getRoundName();
+            } else if (!sharedRound.equals(round)) {
+                throw new CommonException("Select candidates from the same interview round to reschedule together.");
+            }
+            assertNoScoresYet(candidate, round);
+            oldPanelIds.add(existing.getPanelId());
+            if (existing.getInterviewDate() != null) {
+                oldDates.add(existing.getInterviewDate());
+            }
+        }
+        request.setRound(sharedRound);
+        if ((request.getRoundName() == null || request.getRoundName().isBlank()) && sharedRoundName != null) {
+            request.setRoundName(sharedRoundName);
+        }
+        List<InterviewScheduleEntity> saved = scheduleInterviewsInternal(request, true);
+        UUID schedulerId = securityUtils.getCurrentUserId();
+        for (UUID panelId : oldPanelIds) {
+            for (LocalDate date : oldDates) {
+                List<InterviewPanelMemberEntity> members = interviewPanelMemberRepository.findByPanelId(panelId);
+                for (InterviewPanelMemberEntity member : members) {
+                    int dayCount = countActiveInterviewsForMember(member.getUserId(), date);
+                    notificationService.upsertCommitteeInterviewDay(
+                            member.getUserId(), date, dayCount, false, schedulerId);
+                }
+            }
+        }
+        return saved;
+    }
+
+    private List<InterviewScheduleEntity> scheduleInterviewsInternal(ScheduleInterviewRequest request, boolean reschedule) {
         int duration = request.getDurationMinutes() != null ? request.getDurationMinutes() : DEFAULT_DURATION_MINUTES;
         if (duration <= 0) {
             throw new CommonException("Interview duration must be greater than 0 minutes.");
@@ -78,27 +138,12 @@ public class InterviewSchedulingService {
 
         List<TimeRangeMins> breaks = normalizeBreaks(request.getBreaks(), request.getStartTime(), request.getEndTime());
 
-        List<CandidateEntity> candidates = candidateRepository.findByIdIn(request.getCandidateIds()).stream()
-                .sorted(Comparator.comparing(CandidateEntity::getCreatedDate))
-                .toList();
-        if (candidates.isEmpty()) {
-            throw new CommonException("No candidates found for the given ids.");
-        }
-        if (request.getCandidateSlots() != null && !request.getCandidateSlots().isEmpty()) {
-            Map<UUID, CandidateEntity> byId = candidates.stream()
-                    .collect(Collectors.toMap(CandidateEntity::getId, c -> c, (a, b) -> a));
-            List<CandidateEntity> ordered = new ArrayList<>();
-            for (UUID id : request.getCandidateIds()) {
-                CandidateEntity c = byId.get(id);
-                if (c == null) {
-                    throw new CommonException("Candidate not found: " + id);
-                }
-                ordered.add(c);
-            }
-            candidates = ordered;
-        }
+        List<CandidateEntity> candidates = loadOrderedCandidates(request);
 
-        int targetRound = resolveAndValidateRound(request, candidates);
+        int targetRound = reschedule
+                ? (request.getRound() != null ? request.getRound() : 1)
+                : resolveAndValidateRound(request, candidates);
+        String roundName = normalizeRoundName(request.getRoundName());
 
         List<Slot> slots = resolveSlots(request, candidates, duration, breaks);
 
@@ -132,10 +177,12 @@ public class InterviewSchedulingService {
             schedule.setEndTime(slot.end());
             schedule.setDurationMinutes(slot.duration());
             schedule.setRound(targetRound);
+            schedule.setRoundName(roundName);
             schedule.setAcceptToken(token);
             schedule.setInviteSentAt(now);
             schedule.setInviteRespondedAt(null);
             saved.add(interviewScheduleRepository.save(schedule));
+            upsertRoundMeta(candidate.getId(), targetRound, roundName, slot);
 
             candidate.setStatus(CandidateStatus.INVITE_SENT);
             candidate.setFinalScore(null);
@@ -151,10 +198,11 @@ public class InterviewSchedulingService {
 
         List<InterviewPanelMemberEntity> members =
                 interviewPanelMemberRepository.findByPanelId(request.getPanelId());
+        UUID schedulerId = securityUtils.getCurrentUserId();
         for (InterviewPanelMemberEntity member : members) {
             int dayCount = countActiveInterviewsForMember(member.getUserId(), request.getInterviewDate());
             notificationService.upsertCommitteeInterviewDay(
-                    member.getUserId(), request.getInterviewDate(), dayCount, false);
+                    member.getUserId(), request.getInterviewDate(), dayCount, false, schedulerId);
 
             UserEntity user = userRepository.findById(member.getUserId()).orElse(null);
             if (user != null && user.getEmail() != null && !user.getEmail().isBlank()) {
@@ -169,6 +217,93 @@ public class InterviewSchedulingService {
 
         queueMailsAfterCommit(mails);
         return saved;
+    }
+
+    /** Cancel INVITE_SENT / SCHEDULED interviews and free the panel slot. */
+    @Transactional
+    public int cancelInterviews(List<UUID> candidateIds) {
+        if (candidateIds == null || candidateIds.isEmpty()) {
+            throw new CommonException("Select at least one candidate to cancel.");
+        }
+        List<CandidateEntity> candidates = candidateRepository.findByIdIn(candidateIds);
+        if (candidates.isEmpty()) {
+            throw new CommonException("No candidates found for the given ids.");
+        }
+        Set<UUID> panelIds = new HashSet<>();
+        Set<LocalDate> dates = new HashSet<>();
+        int cancelled = 0;
+        for (CandidateEntity candidate : candidates) {
+            if (candidate.getStatus() != CandidateStatus.INVITE_SENT
+                    && candidate.getStatus() != CandidateStatus.SCHEDULED) {
+                throw new CommonException("Candidate '" + candidate.getName()
+                        + "' is not Invite Sent / Scheduled — cannot cancel.");
+            }
+            InterviewScheduleEntity schedule = interviewScheduleRepository.findByCandidateId(candidate.getId())
+                    .orElseThrow(() -> new CommonException("Candidate '" + candidate.getName()
+                            + "' has no interview schedule."));
+            int round = schedule.getRound() != null ? schedule.getRound() : 1;
+            assertNoScoresYet(candidate, round);
+            if (schedule.getPanelId() != null) {
+                panelIds.add(schedule.getPanelId());
+            }
+            if (schedule.getInterviewDate() != null) {
+                dates.add(schedule.getInterviewDate());
+            }
+            archiveAcceptToken(schedule);
+            schedule.setAcceptToken(null);
+            interviewScheduleRepository.delete(schedule);
+
+            // Round 1 → Shortlisted; later rounds → Qualified (ready to re-schedule that round).
+            candidate.setStatus(round <= 1 ? CandidateStatus.SHORTLISTED : CandidateStatus.QUALIFIED);
+            candidate.setFinalScore(null);
+            candidateRepository.save(candidate);
+            cancelled++;
+        }
+
+        UUID actorId = securityUtils.getCurrentUserId();
+        for (UUID panelId : panelIds) {
+            for (LocalDate date : dates) {
+                List<InterviewPanelMemberEntity> members = interviewPanelMemberRepository.findByPanelId(panelId);
+                for (InterviewPanelMemberEntity member : members) {
+                    int dayCount = countActiveInterviewsForMember(member.getUserId(), date);
+                    notificationService.upsertCommitteeInterviewDay(
+                            member.getUserId(), date, dayCount, false, actorId);
+                }
+            }
+        }
+        return cancelled;
+    }
+
+    private List<CandidateEntity> loadOrderedCandidates(ScheduleInterviewRequest request) {
+        List<CandidateEntity> candidates = candidateRepository.findByIdIn(request.getCandidateIds()).stream()
+                .sorted(Comparator.comparing(CandidateEntity::getCreatedDate))
+                .toList();
+        if (candidates.isEmpty()) {
+            throw new CommonException("No candidates found for the given ids.");
+        }
+        if (request.getCandidateSlots() != null && !request.getCandidateSlots().isEmpty()) {
+            Map<UUID, CandidateEntity> byId = candidates.stream()
+                    .collect(Collectors.toMap(CandidateEntity::getId, c -> c, (a, b) -> a));
+            List<CandidateEntity> ordered = new ArrayList<>();
+            for (UUID id : request.getCandidateIds()) {
+                CandidateEntity c = byId.get(id);
+                if (c == null) {
+                    throw new CommonException("Candidate not found: " + id);
+                }
+                ordered.add(c);
+            }
+            return ordered;
+        }
+        return candidates;
+    }
+
+    private void assertNoScoresYet(CandidateEntity candidate, int round) {
+        List<PanelMemberScoreEntity> scores = panelMemberScoreRepository
+                .findByCandidateIdAndRound(candidate.getId(), round);
+        if (scores != null && !scores.isEmpty()) {
+            throw new CommonException("Candidate '" + candidate.getName()
+                    + "' already has interviewer score(s) for this round and cannot be rescheduled or cancelled.");
+        }
     }
 
     /**
@@ -204,7 +339,11 @@ public class InterviewSchedulingService {
             return "SUPERSEDED";
         }
 
+        // Link valid until the day before the interview (expires on interview day and after).
         LocalDate interviewDate = schedule.getInterviewDate();
+        if (interviewDate != null && !LocalDate.now().isBefore(interviewDate)) {
+            return "EXPIRED";
+        }
         UUID panelId = schedule.getPanelId();
 
         if (accept) {
@@ -311,6 +450,36 @@ public class InterviewSchedulingService {
         return events;
     }
 
+    private static String normalizeRoundName(String raw) {
+        if (raw == null) {
+            return null;
+        }
+        String trimmed = raw.trim();
+        if (trimmed.isEmpty()) {
+            return null;
+        }
+        if (trimmed.length() > 120) {
+            throw new CommonException("Round name must be at most 120 characters.");
+        }
+        return trimmed;
+    }
+
+    private void upsertRoundMeta(UUID candidateId, int round, String roundName, Slot slot) {
+        InterviewRoundMetaEntity meta = interviewRoundMetaRepository
+                .findByCandidateIdAndRound(candidateId, round)
+                .orElse(InterviewRoundMetaEntity.builder()
+                        .candidateId(candidateId)
+                        .round(round)
+                        .build());
+        meta.setRoundName(roundName);
+        meta.setPanelId(slot.panelId());
+        meta.setInterviewDate(slot.date());
+        meta.setStartTime(slot.start());
+        meta.setEndTime(slot.end());
+        meta.setDurationMinutes(slot.duration());
+        interviewRoundMetaRepository.save(meta);
+    }
+
     /**
      * Round 1 (or omitted): SHORTLISTED, or re-invite DECLINED / refresh INVITE_SENT.
      * Round R+1: all QUALIFIED, same current schedule round R, request.round == R+1.
@@ -370,7 +539,7 @@ public class InterviewSchedulingService {
             throw new CommonException("To date cannot be before From date.");
         }
 
-        Page<InterviewScheduleEntity> schedules;
+        Page<InterviewRoundMetaEntity> metas;
         String viewKey = view == null ? "PANEL" : view.trim().toUpperCase(Locale.ROOT);
         if ("INTERVIEWER".equals(viewKey)) {
             List<UUID> panelIds = interviewPanelMemberRepository.findByUserId(id).stream()
@@ -380,14 +549,14 @@ public class InterviewSchedulingService {
             if (panelIds.isEmpty()) {
                 return Page.empty(PageRequest.of(page, size));
             }
-            schedules = interviewScheduleRepository.findByPanelIdsAndDateRange(panelIds, from, to, PageRequest.of(page, size));
+            metas = interviewRoundMetaRepository.findByPanelIdsAndDateRange(panelIds, from, to, PageRequest.of(page, size));
         } else if ("PANEL".equals(viewKey)) {
-            schedules = interviewScheduleRepository.findByPanelAndDateRange(id, from, to, PageRequest.of(page, size));
+            metas = interviewRoundMetaRepository.findByPanelAndDateRange(id, from, to, PageRequest.of(page, size));
         } else {
             throw new CommonException("View must be PANEL or INTERVIEWER.");
         }
 
-        return schedules.map(this::toListItem);
+        return metas.map(this::toListItemFromMeta);
     }
 
     private void assertNoMemberConflicts(UUID panelId, LocalDate date, List<Slot> newSlots,
@@ -602,6 +771,51 @@ public class InterviewSchedulingService {
         return slots;
     }
 
+    private InterviewScheduleListItemDTO toListItemFromMeta(InterviewRoundMetaEntity meta) {
+        CandidateEntity candidate = candidateRepository.findById(meta.getCandidateId()).orElse(null);
+        InterviewPanelEntity panel = meta.getPanelId() != null
+                ? interviewPanelRepository.findById(meta.getPanelId()).orElse(null)
+                : null;
+        List<InterviewPanelMemberEntity> members = meta.getPanelId() != null
+                ? interviewPanelMemberRepository.findByPanelId(meta.getPanelId())
+                : List.of();
+        Map<UUID, String> userNames = userRepository.findAllById(
+                members.stream().map(InterviewPanelMemberEntity::getUserId).toList()
+        ).stream().collect(Collectors.toMap(UserEntity::getId, UserEntity::getName, (a, b) -> a));
+
+        String positionTitle = null;
+        String locationName = null;
+        if (candidate != null) {
+            JobPositionEntity position = jobPositionRepository.findById(candidate.getPositionId()).orElse(null);
+            if (position != null) {
+                positionTitle = positionTitleRepository.findById(position.getPositionTitleId())
+                        .map(PositionTitleEntity::getName).orElse(null);
+                locationName = locationRepository.findById(position.getLocationId())
+                        .map(LocationEntity::getName).orElse(null);
+            }
+        }
+
+        String roundName = meta.getRoundName();
+        Integer round = meta.getRound() != null ? meta.getRound() : 1;
+
+        return InterviewScheduleListItemDTO.builder()
+                .id(meta.getId())
+                .interviewDate(meta.getInterviewDate())
+                .startTime(meta.getStartTime())
+                .endTime(meta.getEndTime())
+                .durationMinutes(meta.getDurationMinutes())
+                .candidateName(candidate != null ? candidate.getName() : null)
+                .candidateEmail(candidate != null ? candidate.getEmail() : null)
+                .candidateStatus(candidate != null ? candidate.getStatus().name() : null)
+                .panelName(panel != null ? panel.getName() : null)
+                .panelMemberNames(members.stream().map(m -> userNames.get(m.getUserId())).filter(Objects::nonNull).toList())
+                .positionTitleName(positionTitle)
+                .locationName(locationName)
+                .round(round)
+                .roundName(roundName)
+                .build();
+    }
+
     private InterviewScheduleListItemDTO toListItem(InterviewScheduleEntity schedule) {
         CandidateEntity candidate = candidateRepository.findById(schedule.getCandidateId()).orElse(null);
         InterviewPanelEntity panel = interviewPanelRepository.findById(schedule.getPanelId()).orElse(null);
@@ -636,6 +850,7 @@ public class InterviewSchedulingService {
                 .positionTitleName(positionTitle)
                 .locationName(locationName)
                 .round(schedule.getRound() != null ? schedule.getRound() : 1)
+                .roundName(schedule.getRoundName())
                 .build();
     }
 

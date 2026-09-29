@@ -25,6 +25,7 @@ public class DashboardService {
     private final CandidateOfferRepository candidateOfferRepository;
     private final JobPositionRepository jobPositionRepository;
     private final PositionTitleRepository positionTitleRepository;
+    private final InterviewScheduleRepository interviewScheduleRepository;
 
     public DashboardDetailDTO details(String metricKey) {
         if (metricKey == null || metricKey.isBlank()) {
@@ -92,13 +93,31 @@ public class DashboardService {
                     row.put("Name", nullToDash(c.getName()));
                     row.put("Email", nullToDash(c.getEmail()));
                     row.put("Phone", nullToDash(c.getPhone()));
-                    row.put("Status", c.getStatus() != null ? c.getStatus().name().replace('_', ' ') : "-");
+                    row.put("Status", formatCandidateStatus(c));
                     row.put("Requisition", ctx != null ? nullToDash(ctx.requisition()) : "-");
                     row.put("Position", ctx != null ? nullToDash(ctx.positionTitle()) : "-");
                     return row;
                 })
                 .collect(Collectors.toList());
         return DashboardDetailDTO.builder().metric(metric).title(title).columns(columns).rows(rows).build();
+    }
+
+    private String formatCandidateStatus(CandidateEntity c) {
+        if (c.getStatus() == null) {
+            return "-";
+        }
+        String base = c.getStatus().name().replace('_', ' ');
+        if (c.getStatus() != CandidateStatus.INVITE_SENT
+                && c.getStatus() != CandidateStatus.SCHEDULED
+                && c.getStatus() != CandidateStatus.DECLINED
+                && c.getStatus() != CandidateStatus.QUALIFIED
+                && c.getStatus() != CandidateStatus.DISQUALIFIED) {
+            return base;
+        }
+        int round = interviewScheduleRepository.findByCandidateId(c.getId())
+                .map(s -> s.getRound() != null ? s.getRound() : 1)
+                .orElse(1);
+        return "L" + round + " " + base;
     }
 
     private DashboardDetailDTO offerDetails(String metric, String title, List<CandidateOfferEntity> list) {
@@ -121,8 +140,16 @@ public class DashboardService {
                     row.put("Email", c != null ? nullToDash(c.getEmail()) : "-");
                     row.put("Requisition", ctx != null ? nullToDash(ctx.requisition()) : "-");
                     row.put("Position", ctx != null ? nullToDash(ctx.positionTitle()) : "-");
-                    String statusLabel = o.getStatus() == OfferStatus.SENT ? "OFFER LETTER SENT"
-                            : (o.getStatus() != null ? o.getStatus().name().replace('_', ' ') : "-");
+                    String statusLabel;
+                    if (o.getStatus() == OfferStatus.SENT) {
+                        statusLabel = "OFFER LETTER SENT";
+                    } else if (o.getStatus() == OfferStatus.REJECTED
+                            || o.getStatus() == OfferStatus.L1_REJECTED
+                            || o.getStatus() == OfferStatus.L2_REJECTED) {
+                        statusLabel = "REJECTED";
+                    } else {
+                        statusLabel = o.getStatus() != null ? o.getStatus().name().replace('_', ' ') : "-";
+                    }
                     row.put("Status", statusLabel);
                     row.put("Accept before", o.getAcceptBeforeDate() != null ? o.getAcceptBeforeDate().toString() : "-");
                     row.put("Joining date", o.getJoiningDate() != null ? o.getJoiningDate().toString() : "-");

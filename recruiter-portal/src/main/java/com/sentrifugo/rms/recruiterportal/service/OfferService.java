@@ -196,7 +196,8 @@ public class OfferService {
             notificationService.notifyAdminsAndRecruiters(
                     NotificationService.TYPE_OFFER_SUBMITTED,
                     "New offer letter submitted for approval — " + candidate.getName()
-                            + " (" + positionName + ", " + reqCode + ").");
+                            + " (" + positionName + ", " + reqCode + ").",
+                    currentUserId);
         }
     }
 

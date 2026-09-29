@@ -21,6 +21,15 @@ public interface NotificationRepository extends JpaRepository<NotificationEntity
 
     long countByUserIdAndReadAtIsNullAndCreatedDateGreaterThanEqual(UUID userId, LocalDateTime since);
 
+    @Query("""
+        SELECT COUNT(n) FROM NotificationEntity n
+        WHERE n.userId = :userId
+          AND n.readAt IS NULL
+          AND n.createdDate >= :since
+          AND (n.sourceUserId IS NULL OR n.sourceUserId <> :userId)
+        """)
+    long countUnreadExcludingSelfSourced(@Param("userId") UUID userId, @Param("since") LocalDateTime since);
+
     Optional<NotificationEntity> findByUserIdAndTypeAndReferenceDate(UUID userId, String type, LocalDate referenceDate);
 
     @Modifying(clearAutomatically = true)

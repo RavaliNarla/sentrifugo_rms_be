@@ -52,6 +52,10 @@ public class InterviewScheduleEntity extends BaseEntity<UUID> {
     @Builder.Default
     private Integer round = 1;
 
+    /** Optional label for the current round (e.g. Technical). Historical names live in interview_round_meta. */
+    @Column(name = "round_name", length = 120)
+    private String roundName;
+
     /** Token for Accept / Decline links in the candidate invite email. */
     @Column(name = "accept_token", unique = true)
     private UUID acceptToken;

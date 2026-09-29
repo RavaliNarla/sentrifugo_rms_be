@@ -32,7 +32,7 @@ public class SchemaConstraintFixer implements CommandLineRunner {
                     ALTER TABLE recruitment.candidates ADD CONSTRAINT candidates_status_check CHECK (
                       status::text = ANY (ARRAY[
                         'DRAFT','ADDED','SHORTLISTED','REJECTED','ON_HOLD','INVITE_SENT','SCHEDULED','DECLINED',
-                        'QUALIFIED','DISQUALIFIED','COMPENSATION_PENDING','MOVED_TO_OFFER'
+                        'QUALIFIED','DISQUALIFIED','COMPENSATION_PENDING','COMPENSATION_SUBMITTED','MOVED_TO_OFFER'
                       ]::text[])
                     )
                     """);

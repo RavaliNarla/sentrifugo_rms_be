@@ -29,12 +29,16 @@ public class InterviewScheduleDTO {
     private Integer membersScored;
     private Integer membersTotal;
     private Integer round;
+    private String roundName;
 
     /** The current interviewer's own previously-saved score/rationale/decision, if any (SCL_29). */
     private BigDecimal myScore;
     private String myRationale;
     private String myDecision;
 
-    /** Per-interviewer breakdown for recruiter Interview Pool tooltip. */
+    /** Per-interviewer breakdown for the current round (kept for compatibility). */
     private java.util.List<PanelMemberScoreViewDTO> memberScores;
+
+    /** All rounds with scores, newest first — Interview Pool tooltip. */
+    private java.util.List<InterviewRoundFeedbackDTO> roundFeedback;
 }

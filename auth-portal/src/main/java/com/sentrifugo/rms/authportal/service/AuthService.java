@@ -63,25 +63,26 @@ public class AuthService {
 
     @Transactional
     public void forgotPassword(ForgotPasswordRequest request) {
-        // Always succeed from the caller's perspective to avoid account enumeration.
-        userRepository.findByEmailOrEmployeeIdIgnoreCase(request.getUsername().trim()).ifPresent(user -> {
-            String otp = String.format("%06d", secureRandom.nextInt(1_000_000));
-            user.setResetOtp(otp);
-            user.setResetOtpExpiresAt(LocalDateTime.now().plusMinutes(OTP_TTL_MINUTES));
-            userRepository.save(user);
+        UserEntity user = userRepository.findByEmailOrEmployeeIdIgnoreCase(request.getUsername().trim())
+                .orElseThrow(() -> new CommonException(
+                        "No account found for this Employee ID or email. Please check and try again."));
 
-            String html = "<p>Hello " + escape(user.getName()) + ",</p>"
-                    + "<p>Your password reset OTP for Sagar Recruitment Hub is:</p>"
-                    + "<p style='font-size:24px;font-weight:bold;letter-spacing:4px;'>" + otp + "</p>"
-                    + "<p>This code expires in " + OTP_TTL_MINUTES + " minutes. If you did not request a reset, ignore this email.</p>";
+        String otp = String.format("%06d", secureRandom.nextInt(1_000_000));
+        user.setResetOtp(otp);
+        user.setResetOtpExpiresAt(LocalDateTime.now().plusMinutes(OTP_TTL_MINUTES));
+        userRepository.save(user);
 
-            MailService mail = mailService.getIfAvailable();
-            if (mail != null) {
-                mail.sendHtmlEmail(user.getEmail(), "Password Reset OTP - Sagar Recruitment Hub", html);
-            } else {
-                log.warn("MailService unavailable — OTP for {} is {}", user.getEmail(), otp);
-            }
-        });
+        String html = "<p>Hello " + escape(user.getName()) + ",</p>"
+                + "<p>Your password reset OTP for Sagar Recruitment Hub is:</p>"
+                + "<p style='font-size:24px;font-weight:bold;letter-spacing:4px;'>" + otp + "</p>"
+                + "<p>This code expires in " + OTP_TTL_MINUTES + " minutes. If you did not request a reset, ignore this email.</p>";
+
+        MailService mail = mailService.getIfAvailable();
+        if (mail != null) {
+            mail.sendHtmlEmail(user.getEmail(), "Password Reset OTP - Sagar Recruitment Hub", html);
+        } else {
+            log.warn("MailService unavailable — OTP for {} is {}", user.getEmail(), otp);
+        }
     }
 
     @Transactional

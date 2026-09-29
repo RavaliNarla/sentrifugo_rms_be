@@ -30,7 +30,7 @@ public class SchemaConstraintFixer implements CommandLineRunner {
                     ALTER TABLE recruitment.candidates ADD CONSTRAINT candidates_status_check CHECK (
                       status::text = ANY (ARRAY[
                         'DRAFT','ADDED','SHORTLISTED','REJECTED','ON_HOLD','INVITE_SENT','SCHEDULED','DECLINED',
-                        'QUALIFIED','DISQUALIFIED','COMPENSATION_PENDING','MOVED_TO_OFFER'
+                        'QUALIFIED','DISQUALIFIED','COMPENSATION_PENDING','COMPENSATION_SUBMITTED','MOVED_TO_OFFER'
                       ]::text[])
                     )
                     """);
@@ -94,6 +94,74 @@ public class SchemaConstraintFixer implements CommandLineRunner {
             log.info("Ensured recruitment.panel_member_scores.round exists and defaults to 1");
         } catch (Exception e) {
             log.warn("Could not ensure panel_member_scores.round: {}", e.getMessage());
+        }
+
+        try {
+            jdbcTemplate.execute("""
+                    ALTER TABLE recruitment.interview_schedule
+                    ADD COLUMN IF NOT EXISTS round_name varchar(120)
+                    """);
+            log.info("Ensured recruitment.interview_schedule.round_name exists");
+        } catch (Exception e) {
+            log.warn("Could not ensure interview_schedule.round_name: {}", e.getMessage());
+        }
+
+        try {
+            jdbcTemplate.execute("""
+                    CREATE TABLE IF NOT EXISTS recruitment.interview_round_meta (
+                      id uuid PRIMARY KEY,
+                      candidate_id uuid NOT NULL,
+                      round integer NOT NULL,
+                      round_name varchar(120),
+                      panel_id uuid,
+                      interview_date date,
+                      start_time time,
+                      end_time time,
+                      duration_minutes integer,
+                      created_by uuid,
+                      created_date timestamp,
+                      modified_by uuid,
+                      modified_date timestamp,
+                      is_active boolean DEFAULT true
+                    )
+                    """);
+            jdbcTemplate.execute("ALTER TABLE recruitment.interview_round_meta ADD COLUMN IF NOT EXISTS panel_id uuid");
+            jdbcTemplate.execute("ALTER TABLE recruitment.interview_round_meta ADD COLUMN IF NOT EXISTS interview_date date");
+            jdbcTemplate.execute("ALTER TABLE recruitment.interview_round_meta ADD COLUMN IF NOT EXISTS start_time time");
+            jdbcTemplate.execute("ALTER TABLE recruitment.interview_round_meta ADD COLUMN IF NOT EXISTS end_time time");
+            jdbcTemplate.execute("ALTER TABLE recruitment.interview_round_meta ADD COLUMN IF NOT EXISTS duration_minutes integer");
+            jdbcTemplate.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS ux_interview_round_meta_candidate_round
+                    ON recruitment.interview_round_meta (candidate_id, round)
+                    WHERE is_active = true
+                    """);
+            // Seed current live schedules so Panel Management history is not empty after deploy.
+            jdbcTemplate.execute("""
+                    INSERT INTO recruitment.interview_round_meta (
+                      id, candidate_id, round, round_name, panel_id, interview_date,
+                      start_time, end_time, duration_minutes, is_active, created_date
+                    )
+                    SELECT gen_random_uuid(), s.candidate_id, COALESCE(s.round, 1), s.round_name, s.panel_id,
+                           s.interview_date, s.start_time, s.end_time, s.duration_minutes, true, NOW()
+                    FROM recruitment.interview_schedule s
+                    WHERE COALESCE(s.is_active, true) = true
+                      AND NOT EXISTS (
+                        SELECT 1 FROM recruitment.interview_round_meta m
+                        WHERE m.candidate_id = s.candidate_id
+                          AND m.round = COALESCE(s.round, 1)
+                          AND COALESCE(m.is_active, true) = true
+                      )
+                    """);
+            log.info("Ensured recruitment.interview_round_meta exists (with schedule snapshot columns)");
+        } catch (Exception e) {
+            log.warn("Could not ensure interview_round_meta: {}", e.getMessage());
+        }
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE hr.notifications ADD COLUMN IF NOT EXISTS source_user_id uuid");
+            log.info("Ensured hr.notifications.source_user_id exists");
+        } catch (Exception e) {
+            log.warn("Could not ensure notifications.source_user_id: {}", e.getMessage());
         }
     }
 }

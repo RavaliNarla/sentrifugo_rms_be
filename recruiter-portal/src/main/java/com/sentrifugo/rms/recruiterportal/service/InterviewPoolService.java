@@ -6,6 +6,7 @@ import com.sentrifugo.rms.common.util.SecurityUtils;
 import com.sentrifugo.rms.db.entity.*;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
 import com.sentrifugo.rms.db.repository.*;
+import com.sentrifugo.rms.recruiterportal.dto.InterviewRoundFeedbackDTO;
 import com.sentrifugo.rms.recruiterportal.dto.InterviewScheduleDTO;
 import com.sentrifugo.rms.recruiterportal.dto.JobRequisitionDTO;
 import com.sentrifugo.rms.recruiterportal.dto.PanelMemberScoreViewDTO;
@@ -44,6 +45,7 @@ public class InterviewPoolService {
     private final JobPositionRepository jobPositionRepository;
     private final JobRequisitionRepository jobRequisitionRepository;
     private final UserRepository userRepository;
+    private final InterviewRoundMetaRepository interviewRoundMetaRepository;
     private final SecurityUtils securityUtils;
 
     public Page<InterviewScheduleDTO> getInterviewPool(UUID positionId, List<CandidateStatus> statuses, String searchText, int page, int size) {
@@ -134,6 +136,14 @@ public class InterviewPoolService {
         if (scoreValue.compareTo(SCORE_MIN) < 0 || scoreValue.compareTo(SCORE_MAX) > 0) {
             throw new CommonException("Score must be between 1 and 10 (decimals allowed, e.g. 7.5).");
         }
+        String rationale = request.getRationale() != null ? request.getRationale().trim() : "";
+        if (rationale.isEmpty()) {
+            throw new CommonException("Rationale is required for each score.");
+        }
+        String decision = request.getDecision() != null ? request.getDecision().trim().toUpperCase() : "";
+        if (!List.of("SELECT", "REJECT", "HOLD").contains(decision)) {
+            throw new CommonException("Decision must be Select, Reject, or Hold.");
+        }
 
         PanelMemberScoreEntity score = panelMemberScoreRepository
                 .findByCandidateIdAndPanelMemberIdAndRound(candidate.getId(), panelMemberId, round)
@@ -143,9 +153,9 @@ public class InterviewPoolService {
                         .round(round)
                         .build());
         score.setScore(scoreValue);
-        score.setRationale(request.getRationale());
+        score.setRationale(rationale);
         // Stored for recruiter visibility; does NOT drive QUALIFIED / DISQUALIFIED.
-        score.setDecision(request.getDecision());
+        score.setDecision(decision);
         panelMemberScoreRepository.save(score);
 
         List<UUID> panelMemberIds = interviewPanelMemberRepository.findByPanelId(schedule.getPanelId()).stream()
@@ -177,13 +187,16 @@ public class InterviewPoolService {
         int membersScored = 0;
         UUID panelId = null;
         Integer round = null;
+        String roundName = null;
         BigDecimal myScore = null;
         String myRationale = null;
         String myDecision = null;
         List<PanelMemberScoreViewDTO> memberScores = null;
+        List<InterviewRoundFeedbackDTO> roundFeedback = null;
         if (schedule != null) {
             panelId = schedule.getPanelId();
             round = schedule.getRound() != null ? schedule.getRound() : 1;
+            roundName = schedule.getRoundName();
             panelName = interviewPanelRepository.findById(schedule.getPanelId()).map(InterviewPanelEntity::getName).orElse(null);
             List<UUID> panelMemberIds = interviewPanelMemberRepository.findByPanelId(schedule.getPanelId()).stream()
                     .map(InterviewPanelMemberEntity::getUserId)
@@ -218,6 +231,9 @@ public class InterviewPoolService {
                             .build());
                 }
             }
+            if (includeMemberScores) {
+                roundFeedback = buildRoundFeedback(candidate.getId(), schedule);
+            }
         }
         return InterviewScheduleDTO.builder()
                 .candidateId(candidate.getId())
@@ -233,10 +249,69 @@ public class InterviewPoolService {
                 .membersScored(membersScored)
                 .membersTotal(membersTotal)
                 .round(round)
+                .roundName(roundName)
                 .myScore(myScore)
                 .myRationale(myRationale)
                 .myDecision(myDecision)
                 .memberScores(memberScores)
+                .roundFeedback(roundFeedback)
                 .build();
+    }
+
+    /**
+     * All scored rounds for this candidate, newest first. Round names come from interview_round_meta
+     * (survives schedule overwrite); current schedule roundName is a fallback for the live round.
+     */
+    private List<InterviewRoundFeedbackDTO> buildRoundFeedback(UUID candidateId, InterviewScheduleEntity schedule) {
+        List<PanelMemberScoreEntity> allScores = panelMemberScoreRepository.findByCandidateId(candidateId);
+        if (allScores.isEmpty()) {
+            return List.of();
+        }
+
+        Map<Integer, String> roundNames = interviewRoundMetaRepository.findByCandidateId(candidateId).stream()
+                .filter(m -> m.getRound() != null)
+                .collect(Collectors.toMap(
+                        InterviewRoundMetaEntity::getRound,
+                        m -> m.getRoundName() != null ? m.getRoundName() : "",
+                        (a, b) -> a.isBlank() ? b : a));
+        if (schedule.getRound() != null && schedule.getRoundName() != null && !schedule.getRoundName().isBlank()) {
+            roundNames.putIfAbsent(schedule.getRound(), schedule.getRoundName());
+        }
+
+        Set<UUID> interviewerIds = allScores.stream()
+                .map(PanelMemberScoreEntity::getPanelMemberId)
+                .collect(Collectors.toSet());
+        Map<UUID, String> names = userRepository.findAllById(interviewerIds).stream()
+                .collect(Collectors.toMap(UserEntity::getId, UserEntity::getName, (a, b) -> a));
+
+        Map<Integer, List<PanelMemberScoreEntity>> byRound = allScores.stream()
+                .collect(Collectors.groupingBy(s -> s.getRound() != null ? s.getRound() : 1));
+
+        return byRound.entrySet().stream()
+                .sorted(Map.Entry.<Integer, List<PanelMemberScoreEntity>>comparingByKey().reversed())
+                .map(entry -> {
+                    Integer r = entry.getKey();
+                    String name = roundNames.get(r);
+                    if (name != null && name.isBlank()) {
+                        name = null;
+                    }
+                    List<PanelMemberScoreViewDTO> scores = entry.getValue().stream()
+                            .sorted(Comparator.comparing(
+                                    s -> names.getOrDefault(s.getPanelMemberId(), "Interviewer"),
+                                    String.CASE_INSENSITIVE_ORDER))
+                            .map(s -> PanelMemberScoreViewDTO.builder()
+                                    .interviewerName(names.getOrDefault(s.getPanelMemberId(), "Interviewer"))
+                                    .score(s.getScore())
+                                    .rationale(s.getRationale())
+                                    .decision(s.getDecision())
+                                    .build())
+                            .toList();
+                    return InterviewRoundFeedbackDTO.builder()
+                            .round(r)
+                            .roundName(name)
+                            .scores(scores)
+                            .build();
+                })
+                .toList();
     }
 }

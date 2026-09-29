@@ -24,4 +24,7 @@ public class InterviewPanelDTO {
     private List<UUID> memberIds;
 
     private List<String> memberNames;
+
+    /** True when this panel has live or historical interview schedules — edit/delete blocked. */
+    private Boolean hasSchedules;
 }

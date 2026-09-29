@@ -2,6 +2,7 @@ package com.sentrifugo.rms.recruiterportal.dto;
 
 import jakarta.validation.constraints.DecimalMax;
 import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -26,8 +27,10 @@ public class ScoreSubmitRequest {
     private BigDecimal score;
 
     /** Renamed from "Comment" - interviewer must justify the score given. */
+    @NotBlank(message = "Rationale is required")
     private String rationale;
 
     /** SELECT / REJECT / HOLD. */
+    @NotBlank(message = "Decision is required")
     private String decision;
 }

@@ -8,6 +8,7 @@ import com.sentrifugo.rms.db.entity.CandidateEntity;
 import com.sentrifugo.rms.db.entity.JobPositionEntity;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
 import com.sentrifugo.rms.db.repository.CandidateRepository;
+import com.sentrifugo.rms.db.repository.InterviewScheduleRepository;
 import com.sentrifugo.rms.db.repository.JobPositionRepository;
 import com.sentrifugo.rms.db.repository.PositionTitleRepository;
 import com.sentrifugo.rms.recruiterportal.dto.CandidateDTO;
@@ -49,6 +50,7 @@ public class CandidateService {
     private final CandidateRepository candidateRepository;
     private final JobPositionRepository jobPositionRepository;
     private final PositionTitleRepository positionTitleRepository;
+    private final InterviewScheduleRepository interviewScheduleRepository;
     private final FileStorageService fileStorageService;
     private final MailService mailService;
 
@@ -360,6 +362,9 @@ public class CandidateService {
         String positionTitleName = jobPositionRepository.findById(entity.getPositionId())
                 .map(p -> positionTitleRepository.findById(p.getPositionTitleId()).map(t -> t.getName()).orElse(null))
                 .orElse(null);
+        Integer interviewRound = interviewScheduleRepository.findByCandidateId(entity.getId())
+                .map(s -> s.getRound() != null ? s.getRound() : 1)
+                .orElse(null);
         return CandidateDTO.builder()
                 .id(entity.getId())
                 .requisitionId(entity.getRequisitionId())
@@ -375,6 +380,7 @@ public class CandidateService {
                 .photoUrl(entity.getPhotoUrl())
                 .hasPhoto(entity.getPhotoUrl() != null)
                 .status(entity.getStatus().name())
+                .interviewRound(interviewRound)
                 .finalScore(entity.getFinalScore())
                 .salary(entity.getSalary())
                 .currentCtc(entity.getCurrentCtc())

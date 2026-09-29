@@ -40,6 +40,9 @@ public class ScheduleInterviewRequest {
      */
     private Integer round;
 
+    /** Optional label shown in Interview Pool as "1 (Technical)". Max 120 chars. */
+    private String roundName;
+
     /** Lunch / other gaps — interviews must not overlap these. */
     @Valid
     private List<BreakWindow> breaks;
@@ -105,6 +108,14 @@ public class ScheduleInterviewRequest {
 
     public void setRound(Integer round) {
         this.round = round;
+    }
+
+    public String getRoundName() {
+        return roundName;
+    }
+
+    public void setRoundName(String roundName) {
+        this.roundName = roundName;
     }
 
     public List<BreakWindow> getBreaks() {

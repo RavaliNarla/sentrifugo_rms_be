@@ -14,6 +14,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Tag(name = "Interview Scheduling")
@@ -29,6 +31,21 @@ public class InterviewSchedulingController {
     public ResponseEntity<ApiResponse<Integer>> schedule(@Valid @RequestBody ScheduleInterviewRequest request) {
         int count = interviewSchedulingService.scheduleInterviews(request).size();
         return ResponseEntity.ok(ApiResponse.ok(count, "Scheduled " + count + " candidate(s) for interview"));
+    }
+
+    @Operation(summary = "Reschedule INVITE_SENT / SCHEDULED interviews (blocked if any scores exist)")
+    @PostMapping("/reschedule")
+    public ResponseEntity<ApiResponse<Integer>> reschedule(@Valid @RequestBody ScheduleInterviewRequest request) {
+        int count = interviewSchedulingService.rescheduleInterviews(request).size();
+        return ResponseEntity.ok(ApiResponse.ok(count, "Rescheduled " + count + " candidate(s)"));
+    }
+
+    @Operation(summary = "Cancel INVITE_SENT / SCHEDULED interviews and free panel slots")
+    @PostMapping("/cancel")
+    public ResponseEntity<ApiResponse<Integer>> cancel(@RequestBody Map<String, List<UUID>> body) {
+        List<UUID> ids = body != null ? body.get("candidateIds") : null;
+        int count = interviewSchedulingService.cancelInterviews(ids);
+        return ResponseEntity.ok(ApiResponse.ok(count, "Cancelled " + count + " interview(s)"));
     }
 
     @Operation(summary = "Browse upcoming interview schedules by panel or interviewer (paginated)")

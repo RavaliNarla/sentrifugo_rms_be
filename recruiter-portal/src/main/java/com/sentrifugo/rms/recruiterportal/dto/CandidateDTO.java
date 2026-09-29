@@ -47,6 +47,7 @@ public class CandidateDTO {
     private boolean hasPhoto;
 
     private String status;
+    private Integer interviewRound;
     private BigDecimal finalScore;
 
     private BigDecimal salary;

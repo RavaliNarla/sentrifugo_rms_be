@@ -48,4 +48,11 @@ public class NotificationEntity extends BaseEntity<UUID> {
     @Column(name = "interview_count")
     @Builder.Default
     private Integer interviewCount = 0;
+
+    /**
+     * User who triggered the event (e.g. recruiter who submitted a req/offer or scheduled).
+     * Unread badge excludes rows where sourceUserId equals the recipient.
+     */
+    @Column(name = "source_user_id")
+    private UUID sourceUserId;
 }
