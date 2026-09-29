@@ -1,5 +1,7 @@
 package com.sentrifugo.rms.recruiterportal.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentrifugo.rms.common.exception.CommonException;
 import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
 import com.sentrifugo.rms.common.util.SecurityUtils;
@@ -22,11 +24,13 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.sentrifugo.rms.recruiterportal.email.RmsEmailTemplates;
 
 @Service
 @RequiredArgsConstructor
@@ -36,6 +40,13 @@ public class InterviewPoolService {
     private static final BigDecimal PASS_MARK = BigDecimal.valueOf(5);
     private static final BigDecimal SCORE_MIN = BigDecimal.ONE;
     private static final BigDecimal SCORE_MAX = BigDecimal.TEN;
+    private static final List<String> DECISIONS = List.of(
+            "STRONG_HIRE", "HIRE", "HOLD", "DO_NOT_HIRE",
+            // legacy values still accepted if already saved
+            "SELECT", "REJECT");
+    private static final List<String> COMPETENCY_KEYS = List.of(
+            "TECHNICAL_KNOWLEDGE", "RELEVANT_EXPERIENCE", "COMMUNICATION",
+            "PROBLEM_SOLVING", "ATTITUDE_APPROACH");
 
     private final CandidateRepository candidateRepository;
     private final InterviewScheduleRepository interviewScheduleRepository;
@@ -47,6 +58,8 @@ public class InterviewPoolService {
     private final UserRepository userRepository;
     private final InterviewRoundMetaRepository interviewRoundMetaRepository;
     private final SecurityUtils securityUtils;
+    private final ObjectMapper objectMapper;
+    private final RmsEmailTemplates emailTemplates;
 
     private static final List<CandidateStatus> INTERVIEW_POOL_STATUSES =
             List.of(CandidateStatus.INVITE_SENT, CandidateStatus.SCHEDULED, CandidateStatus.DECLINED,
@@ -149,17 +162,48 @@ public class InterviewPoolService {
 
         int round = schedule.getRound() != null ? schedule.getRound() : 1;
 
+        boolean hasScore = request.getScore() != null;
+        String rationale = request.getRationale() != null ? request.getRationale().trim() : "";
+        String decision = request.getDecision() != null ? request.getDecision().trim().toUpperCase() : "";
+        boolean hasRationale = !rationale.isEmpty();
+        boolean hasDecision = !decision.isEmpty();
+        Map<String, Integer> competency = normalizeCompetency(request.getCompetencyRatings());
+        boolean competencyStarted = competency.values().stream().anyMatch(v -> v != null);
+        String keyObservations = request.getKeyObservations() != null ? request.getKeyObservations().trim() : "";
+
+        if (competencyStarted) {
+            for (String key : COMPETENCY_KEYS) {
+                Integer v = competency.get(key);
+                if (v == null) {
+                    throw new CommonException("If any competency rating is filled, all five competencies must be rated (1–5).");
+                }
+                if (v < 1 || v > 5) {
+                    throw new CommonException("Competency ratings must be between 1 and 5.");
+                }
+            }
+            // Filling competency requires the main three fields as well.
+            if (!hasScore || !hasRationale || !hasDecision) {
+                throw new CommonException("Competency assessment requires Rating, Rationale, and Decision to be filled for this candidate.");
+            }
+        }
+
+        boolean anyMain = hasScore || hasRationale || hasDecision;
+        if (!anyMain && !competencyStarted && keyObservations.isEmpty()) {
+            throw new CommonException("Nothing to save for this candidate. Fill Rating, Rationale, and Decision together.");
+        }
+        if (anyMain && !(hasScore && hasRationale && hasDecision)) {
+            throw new CommonException("For each candidate, Rating, Rationale, and Decision must all be filled together (or all left blank).");
+        }
+        if (!hasScore) {
+            throw new CommonException("Rating is required when saving a score.");
+        }
+
         BigDecimal scoreValue = request.getScore().setScale(2, RoundingMode.HALF_UP);
         if (scoreValue.compareTo(SCORE_MIN) < 0 || scoreValue.compareTo(SCORE_MAX) > 0) {
             throw new CommonException("Score must be between 1 and 10 (decimals allowed, e.g. 7.5).");
         }
-        String rationale = request.getRationale() != null ? request.getRationale().trim() : "";
-        if (rationale.isEmpty()) {
-            throw new CommonException("Rationale is required for each score.");
-        }
-        String decision = request.getDecision() != null ? request.getDecision().trim().toUpperCase() : "";
-        if (!List.of("SELECT", "REJECT", "HOLD").contains(decision)) {
-            throw new CommonException("Decision must be Select, Reject, or Hold.");
+        if (!DECISIONS.contains(decision)) {
+            throw new CommonException("Decision must be Strong Hire, Hire, Hold, or Do Not Hire.");
         }
 
         PanelMemberScoreEntity score = panelMemberScoreRepository
@@ -173,6 +217,12 @@ public class InterviewPoolService {
         score.setRationale(rationale);
         // Stored for recruiter visibility; does NOT drive QUALIFIED / DISQUALIFIED.
         score.setDecision(decision);
+        try {
+            score.setCompetencyJson(competencyStarted ? objectMapper.writeValueAsString(competency) : null);
+        } catch (Exception e) {
+            throw new CommonException("Could not save competency assessment.");
+        }
+        score.setKeyObservations(keyObservations.isEmpty() ? null : keyObservations);
         panelMemberScoreRepository.save(score);
 
         List<UUID> panelMemberIds = interviewPanelMemberRepository.findByPanelId(schedule.getPanelId()).stream()
@@ -192,8 +242,49 @@ public class InterviewPoolService {
             BigDecimal average = sum.divide(BigDecimal.valueOf(panelMemberIds.size()), 2, RoundingMode.HALF_UP);
             candidate.setFinalScore(average);
             // Qualification is by average score only (pass mark 5). Per-interviewer Decision is informational.
-            candidate.setStatus(average.compareTo(PASS_MARK) >= 0 ? CandidateStatus.QUALIFIED : CandidateStatus.DISQUALIFIED);
+            boolean qualified = average.compareTo(PASS_MARK) >= 0;
+            candidate.setStatus(qualified ? CandidateStatus.QUALIFIED : CandidateStatus.DISQUALIFIED);
             candidateRepository.save(candidate);
+            try {
+                if (candidate.getEmail() != null && !candidate.getEmail().isBlank()) {
+                    RmsEmailTemplates.BuiltEmail email = emailTemplates.interviewOutcome(
+                            candidate.getName(), null, round, schedule.getRoundName(),
+                            qualified, schedule.getInterviewDate());
+                    emailTemplates.sendAsync(candidate.getEmail(), email, true, "interview-result.pdf");
+                }
+            } catch (Exception e) {
+                // best-effort email
+            }
+        }
+    }
+
+    private Map<String, Integer> normalizeCompetency(Map<String, Integer> raw) {
+        Map<String, Integer> out = new LinkedHashMap<>();
+        for (String key : COMPETENCY_KEYS) {
+            out.put(key, null);
+        }
+        if (raw == null) {
+            return out;
+        }
+        for (String key : COMPETENCY_KEYS) {
+            Integer v = raw.get(key);
+            if (v == null) {
+                // also accept camelCase from older clients
+                continue;
+            }
+            out.put(key, v);
+        }
+        return out;
+    }
+
+    private Map<String, Integer> parseCompetencyJson(String json) {
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return objectMapper.readValue(json, new TypeReference<Map<String, Integer>>() {});
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -208,6 +299,8 @@ public class InterviewPoolService {
         BigDecimal myScore = null;
         String myRationale = null;
         String myDecision = null;
+        Map<String, Integer> myCompetencyRatings = null;
+        String myKeyObservations = null;
         List<PanelMemberScoreViewDTO> memberScores = null;
         List<InterviewRoundFeedbackDTO> roundFeedback = null;
         if (schedule != null) {
@@ -232,6 +325,8 @@ public class InterviewPoolService {
                     myScore = mine.getScore();
                     myRationale = mine.getRationale();
                     myDecision = mine.getDecision();
+                    myCompetencyRatings = parseCompetencyJson(mine.getCompetencyJson());
+                    myKeyObservations = mine.getKeyObservations();
                 }
             }
             if (includeMemberScores && !roundScores.isEmpty()) {
@@ -270,6 +365,8 @@ public class InterviewPoolService {
                 .myScore(myScore)
                 .myRationale(myRationale)
                 .myDecision(myDecision)
+                .myCompetencyRatings(myCompetencyRatings)
+                .myKeyObservations(myKeyObservations)
                 .memberScores(memberScores)
                 .roundFeedback(roundFeedback)
                 .build();

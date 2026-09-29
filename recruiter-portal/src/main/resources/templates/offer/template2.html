@@ -3,40 +3,58 @@
 <head>
     <meta charset="UTF-8"/>
     <style>
-        body { font-family: Georgia, 'Times New Roman', serif; color: #222; padding: 40px; }
-        .letterhead { border-bottom: 2px solid #162b75; padding-bottom: 12px; margin-bottom: 26px; }
-        .letterhead h1 { color: #208bbd; font-size: 20px; margin: 0; letter-spacing: 0.5px; }
-        .date-line { text-align: right; font-size: 13px; color: #555; margin-bottom: 18px; }
-        .content p { line-height: 1.7; font-size: 14px; text-align: justify; }
-        .highlight { background: #e7ebec; padding: 14px 18px; border-left: 4px solid #208bbd; margin: 18px 0; font-size: 13px; }
-        .highlight b { color: #162b75; }
-        .signature { margin-top: 40px; font-size: 13px; }
+        body { font-family: Georgia, "Times New Roman", serif; color: #1a1a1a; padding: 36px 42px; font-size: 13px; line-height: 1.5; }
+        .banner { background: #14532d; color: #fff; padding: 14px 16px; border-radius: 4px; margin-bottom: 18px; }
+        .banner h1 { margin: 0; font-size: 18px; font-family: Arial, Helvetica, sans-serif; }
+        .banner p { margin: 4px 0 0; font-size: 12px; opacity: 0.9; font-family: Arial, Helvetica, sans-serif; }
+        .conf { font-weight: 700; text-transform: uppercase; font-size: 11px; color: #14532d; margin: 0 0 14px; }
+        .card { border: 1px solid #d7e3db; border-radius: 6px; overflow: hidden; margin: 16px 0; }
+        .card table { width: 100%; border-collapse: collapse; }
+        .card td { padding: 9px 12px; border-bottom: 1px solid #e6eee9; font-size: 12px; }
+        .card tr:last-child td { border-bottom: none; }
+        .card td.label { width: 40%; background: #f3f8f4; font-weight: 700; }
+        .note { background: #f7faf8; border-left: 3px solid #1b7a3d; padding: 10px 12px; margin: 16px 0; font-size: 12px; }
+        .sign-name { font-weight: 700; margin: 16px 0 0; font-family: Arial, Helvetica, sans-serif; }
+        .sign-title { font-size: 11px; letter-spacing: 0.3px; }
     </style>
 </head>
 <body>
-<div class="letterhead">
-    <h1 th:text="${companyName}">Company Name</h1>
+<div class="banner">
+    <h1 th:text="${companyName}">Sagar Cements Limited</h1>
+    <p>Offer Letter — Modern Format</p>
 </div>
-<div class="date-line">Letter of Offer</div>
-<div class="content">
-    <p>Dear <b th:text="${candidateName}">Candidate Name</b>,</p>
-    <p>Congratulations! Following your successful interview, we are delighted to extend this offer of
-        employment for the position of <b th:text="${positionTitle}">Position</b> in the
-        <b th:text="${department}">Department</b> department, based at <b th:text="${location}">Location</b>.</p>
+<p class="conf">Strictly Private &amp; Confidential</p>
 
-    <div class="highlight">
-        <p><b>Annual Compensation:</b> &#8377; <span th:text="${salary}">0</span></p>
-        <p><b>Offer valid until:</b> <span th:text="${acceptBeforeDate}">date</span></p>
-        <p><b>Joining Date:</b> <span th:text="${joiningDate}">date</span></p>
-        <p><b>Contact:</b> <span th:text="${candidateEmail}">email</span> | <span th:text="${candidatePhone}">phone</span></p>
-    </div>
+<p>Dear <b th:text="${candidateName}">Candidate</b>,</p>
+<p>
+    We are delighted to offer you the opportunity to join <b th:text="${companyName}">Sagar Cements Limited</b>
+    as <b th:text="${positionTitle}">Position</b> at <b th:text="${location}">Location</b>.
+    Your proposed employment terms are summarised below.
+</p>
 
-    <p>Kindly confirm your acceptance of this offer at your earliest convenience, and no later than the date
-        indicated above. Should you have any questions, please do not hesitate to reach out to our HR team.</p>
-    <p>We look forward to having you join us and contribute to our continued success.</p>
+<div class="card">
+    <table>
+        <tr><td class="label">Position</td><td th:text="${positionTitle}">Position</td></tr>
+        <tr><td class="label">Department</td><td th:text="${department}">Department</td></tr>
+        <tr><td class="label">Location</td><td th:text="${location}">Location</td></tr>
+        <tr><td class="label">Annual CTC</td><td>&#8377; <span th:text="${salary}">0</span></td></tr>
+        <tr><td class="label">Candidate Email</td><td th:text="${candidateEmail}">email</td></tr>
+        <tr><td class="label">Candidate Phone</td><td th:text="${candidatePhone}">phone</td></tr>
+        <tr><td class="label">Offer Valid Until</td><td th:text="${acceptBeforeDate}">date</td></tr>
+        <tr><td class="label">Proposed Joining Date</td><td th:text="${joiningDate}">date</td></tr>
+    </table>
 </div>
-<div class="signature">
-    <p>Warm regards,<br/>Human Resources Team<br/><span th:text="${companyName}">Company Name</span></p>
+
+<div class="note">
+    This offer is subject to medical fitness, credential verification, and submission of joining documents.
+    A detailed Letter of Appointment will be issued at the time of joining and will supersede this offer letter.
 </div>
+
+<p>Please confirm your decision using the Accept / Decline options in the accompanying email on or before the validity date.</p>
+
+<p>Warm regards,</p>
+<p>For <span th:text="${companyName}">Sagar Cements Limited</span></p>
+<p class="sign-name">K. GANESH</p>
+<p class="sign-title">GROUP PRESIDENT</p>
 </body>
 </html>

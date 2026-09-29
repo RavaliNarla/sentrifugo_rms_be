@@ -19,6 +19,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.sentrifugo.rms.common.util.IstTime;
 
 @Service
 @RequiredArgsConstructor
@@ -140,7 +141,7 @@ public class JobPositionService {
         if (dto.getApprovedOn() == null) {
             throw new CommonException("Approved On is required.");
         }
-        if (dto.getApprovedOn().isAfter(LocalDate.now())) {
+        if (dto.getApprovedOn().isAfter(IstTime.today())) {
             throw new CommonException("Approved On cannot be a future date.");
         }
         ApprovedByRoleEntity role = approvedByRoleRepository.findById(dto.getApprovedById()).orElse(null);

@@ -3,16 +3,17 @@ package com.sentrifugo.rms.recruiterportal.service;
 import com.sentrifugo.rms.common.exception.CommonException;
 import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
 import com.sentrifugo.rms.common.service.FileStorageService;
-import com.sentrifugo.rms.common.service.MailService;
 import com.sentrifugo.rms.db.entity.CandidateEntity;
 import com.sentrifugo.rms.db.entity.JobPositionEntity;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
+import com.sentrifugo.rms.db.repository.CandidateOfferRepository;
 import com.sentrifugo.rms.db.repository.CandidateRepository;
 import com.sentrifugo.rms.db.repository.InterviewScheduleRepository;
 import com.sentrifugo.rms.db.repository.JobPositionRepository;
 import com.sentrifugo.rms.db.repository.PositionTitleRepository;
 import com.sentrifugo.rms.recruiterportal.dto.CandidateDTO;
 import com.sentrifugo.rms.recruiterportal.dto.ShortlistDecisionRequest;
+import com.sentrifugo.rms.recruiterportal.email.RmsEmailTemplates;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -51,10 +52,11 @@ public class CandidateService {
     private final JobPositionRepository jobPositionRepository;
     private final PositionTitleRepository positionTitleRepository;
     private final InterviewScheduleRepository interviewScheduleRepository;
+    private final CandidateOfferRepository candidateOfferRepository;
     private final FileStorageService fileStorageService;
-    private final MailService mailService;
+    private final RmsEmailTemplates emailTemplates;
 
-    @Value("${app.company.name:Sagar Cement}")
+    @Value("${app.company.name:Sagar Cements Limited}")
     private String companyName;
 
     private static final String RESUME_FOLDER = "resumes";
@@ -285,46 +287,17 @@ public class CandidateService {
         String positionTitle = jobPositionRepository.findById(entity.getPositionId())
                 .map(p -> positionTitleRepository.findById(p.getPositionTitleId()).map(t -> t.getName()).orElse(null))
                 .orElse(null);
-        String positionPhrase = positionTitle != null
-                ? "<b>" + escapeHtml(positionTitle) + "</b> at " + escapeHtml(companyName)
-                : escapeHtml(companyName);
 
-        String body;
-        String subjectPrefix;
-        switch (decision) {
-            case SHORTLIST -> {
-                subjectPrefix = "You have been shortlisted";
-                body = "<p>Dear " + escapeHtml(name) + ",</p>"
-                        + "<p>Thank you for your interest in " + positionPhrase + ".</p>"
-                        + "<p>We are pleased to inform you that you have been <b>shortlisted</b> for the next stage of our recruitment process. Our team will contact you with further details shortly.</p>"
-                        + "<p>Regards,<br/>" + escapeHtml(companyName) + " Recruitment Team</p>";
-            }
-            case HOLD -> {
-                subjectPrefix = "Update on your application";
-                body = "<p>Dear " + escapeHtml(name) + ",</p>"
-                        + "<p>Thank you for your interest in " + positionPhrase + ".</p>"
-                        + "<p>Your application is currently <b>on hold</b>. We will update you as soon as there is further progress.</p>"
-                        + "<p>Regards,<br/>" + escapeHtml(companyName) + " Recruitment Team</p>";
-            }
-            case REJECT -> {
-                subjectPrefix = "Update on your application";
-                body = "<p>Dear " + escapeHtml(name) + ",</p>"
-                        + "<p>Thank you for your interest in " + positionPhrase + ".</p>"
-                        + "<p>After careful consideration, we will not be moving forward with your application at this time.</p>"
-                        + "<p>We appreciate the time you invested and wish you the best in your career.</p>"
-                        + "<p>Regards,<br/>" + escapeHtml(companyName) + " Recruitment Team</p>";
-            }
-            default -> {
-                return;
-            }
-        }
-
-        String subject = subjectPrefix + (positionTitle != null ? " — " + positionTitle : "");
-        String html = body;
+        RmsEmailTemplates.BuiltEmail email = switch (decision) {
+            case SHORTLIST -> emailTemplates.shortlisted(name, positionTitle);
+            case HOLD -> emailTemplates.onHold(name, positionTitle);
+            case REJECT -> emailTemplates.shortlistRejected(name, positionTitle);
+        };
+        boolean attachPdf = decision == ShortlistDecisionRequest.Decision.REJECT;
 
         Runnable send = () -> {
             try {
-                mailService.sendHtmlEmailAsync(to, subject, html);
+                emailTemplates.sendAsync(to, email, attachPdf, "application-update.pdf");
             } catch (Exception e) {
                 log.warn("Failed to queue shortlist status email ({}) to {}: {}", decision, to, e.getMessage());
             }
@@ -339,11 +312,6 @@ public class CandidateService {
         } else {
             send.run();
         }
-    }
-
-    private static String escapeHtml(String value) {
-        if (value == null) return "";
-        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
     }
 
     public String getResumeUrl(UUID id) {
@@ -365,6 +333,9 @@ public class CandidateService {
         Integer interviewRound = interviewScheduleRepository.findByCandidateId(entity.getId())
                 .map(s -> s.getRound() != null ? s.getRound() : 1)
                 .orElse(null);
+        String offerStatus = candidateOfferRepository.findByCandidateId(entity.getId())
+                .map(o -> o.getStatus() != null ? o.getStatus().name() : null)
+                .orElse(null);
         return CandidateDTO.builder()
                 .id(entity.getId())
                 .requisitionId(entity.getRequisitionId())
@@ -381,6 +352,7 @@ public class CandidateService {
                 .hasPhoto(entity.getPhotoUrl() != null)
                 .status(entity.getStatus().name())
                 .interviewRound(interviewRound)
+                .offerStatus(offerStatus)
                 .finalScore(entity.getFinalScore())
                 .salary(entity.getSalary())
                 .currentCtc(entity.getCurrentCtc())

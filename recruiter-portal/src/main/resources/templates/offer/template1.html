@@ -3,43 +3,64 @@
 <head>
     <meta charset="UTF-8"/>
     <style>
-        body { font-family: Arial, Helvetica, sans-serif; color: #1a1a1a; padding: 40px; }
-        .header { text-align: center; border-bottom: 3px solid #208bbd; padding-bottom: 16px; margin-bottom: 24px; }
-        .header h1 { color: #162b75; margin: 0; font-size: 22px; }
-        .header p { color: #208bbd; margin: 4px 0 0; font-size: 13px; }
-        .content p { line-height: 1.6; font-size: 14px; }
-        table.details { width: 100%; border-collapse: collapse; margin: 20px 0; }
-        table.details td { padding: 8px 12px; border: 1px solid #d0d7de; font-size: 13px; }
-        table.details td.label { background-color: #e7ebec; font-weight: bold; width: 40%; }
-        .footer { margin-top: 30px; font-size: 12px; color: #555; }
+        body { font-family: "Times New Roman", Times, serif; color: #111; padding: 36px 42px; font-size: 13px; line-height: 1.45; }
+        .brand { color: #14532d; font-size: 20px; font-weight: 700; letter-spacing: 0.4px; margin: 0; font-family: Arial, Helvetica, sans-serif; }
+        .sub { color: #1b7a3d; font-size: 12px; margin: 2px 0 14px; font-family: Arial, Helvetica, sans-serif; }
+        .meta { font-size: 12px; margin-bottom: 8px; }
+        .conf { font-weight: 700; text-transform: uppercase; margin: 12px 0 16px; font-size: 12px; }
+        .subject { font-weight: 700; text-decoration: underline; margin: 14px 0; }
+        ol { padding-left: 18px; }
+        ol li { margin-bottom: 8px; }
+        table.details { width: 100%; border-collapse: collapse; margin: 14px 0 18px; }
+        table.details td { padding: 7px 10px; border: 1px solid #c5d0c8; font-size: 12px; }
+        table.details td.label { background: #eef6f0; font-weight: 700; width: 38%; }
+        .sign { margin-top: 28px; }
+        .sign-name { font-weight: 700; margin: 18px 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
+        .sign-title { font-size: 11px; letter-spacing: 0.3px; }
+        .rule { border: none; border-top: 2px solid #14532d; margin: 0 0 12px; }
     </style>
 </head>
 <body>
-<div class="header">
-    <h1 th:text="${companyName}">Company Name</h1>
-    <p>Offer of Employment</p>
-</div>
-<div class="content">
-    <p>Dear <b th:text="${candidateName}">Candidate Name</b>,</p>
-    <p>We are pleased to offer you the position detailed below. Please review the terms and confirm your
-        acceptance on or before the date mentioned.</p>
+<p class="brand" th:text="${companyName}">Sagar Cements Limited</p>
+<p class="sub">Offer of Appointment</p>
+<hr class="rule"/>
+<p class="meta">Ref. No.: SCL/HR/OFR/____</p>
+<p class="meta">Date: <span th:text="${acceptBeforeDate}">Date</span></p>
+<p class="conf">Strictly Private &amp; Confidential</p>
 
-    <table class="details">
-        <tr><td class="label">Position</td><td th:text="${positionTitle}">Position</td></tr>
-        <tr><td class="label">Department</td><td th:text="${department}">Department</td></tr>
-        <tr><td class="label">Location</td><td th:text="${location}">Location</td></tr>
-        <tr><td class="label">Annual Compensation</td><td>&#8377; <span th:text="${salary}">0</span></td></tr>
-        <tr><td class="label">Candidate Email</td><td th:text="${candidateEmail}">email</td></tr>
-        <tr><td class="label">Candidate Phone</td><td th:text="${candidatePhone}">phone</td></tr>
-        <tr><td class="label">Accept Before</td><td th:text="${acceptBeforeDate}">date</td></tr>
-        <tr><td class="label">Joining Date</td><td th:text="${joiningDate}">date</td></tr>
-    </table>
+<p>Dear <b th:text="${candidateName}">Candidate</b>,</p>
+<p class="subject">Sub: Offer of Appointment – <span th:text="${positionTitle}">Position</span></p>
+<p>
+    With reference to your application and the subsequent interview you had with us, we are pleased to offer you
+    an appointment as <b th:text="${positionTitle}">Position</b> at
+    <b th:text="${location}">Location</b>. The detailed terms and conditions, including the compensation structure,
+    will be provided in the Letter of Appointment at the time of joining.
+</p>
 
-    <p>This offer is contingent upon successful completion of any pending formalities. We look forward to
-        welcoming you to the team.</p>
-</div>
-<div class="footer">
-    <p>Human Resources<br/><span th:text="${companyName}">Company Name</span></p>
+<table class="details">
+    <tr><td class="label">Position</td><td th:text="${positionTitle}">Position</td></tr>
+    <tr><td class="label">Department</td><td th:text="${department}">Department</td></tr>
+    <tr><td class="label">Location</td><td th:text="${location}">Location</td></tr>
+    <tr><td class="label">Annual Compensation (CTC)</td><td>&#8377; <span th:text="${salary}">0</span></td></tr>
+    <tr><td class="label">Offer Valid Until</td><td th:text="${acceptBeforeDate}">date</td></tr>
+    <tr><td class="label">Proposed Joining Date</td><td th:text="${joiningDate}">date</td></tr>
+</table>
+
+<ol>
+    <li><b>Medical Fitness:</b> This offer is contingent upon your being certified medically fit. You shall undergo a pre-employment medical examination at the Company's cost before the joining date.</li>
+    <li><b>Verification:</b> Appointment is subject to satisfactory verification of your credentials, past employment records and background antecedents.</li>
+    <li><b>Documents at Joining:</b> Please produce original certificates/testimonials, one set of photocopies, two recent passport-size photographs, and a relieving letter from your current employer.</li>
+    <li><b>Letter of Appointment:</b> Detailed terms including compensation will be provided in the Letter of Appointment collected from HR at joining; that letter will supersede this offer.</li>
+    <li><b>Acceptance and Validity:</b> Please confirm acceptance by the date above, failing which this offer shall be deemed to have lapsed.</li>
+    <li><b>Confidentiality:</b> The contents of this offer are confidential and shall not be disclosed to any third party.</li>
+</ol>
+
+<p>We look forward to welcoming you and wish you a successful career with our organization.</p>
+
+<div class="sign">
+    <p>Thanking you,<br/>Yours faithfully,<br/>For <span th:text="${companyName}">Sagar Cements Limited</span></p>
+    <p class="sign-name">K. GANESH</p>
+    <p class="sign-title">GROUP PRESIDENT</p>
 </div>
 </body>
 </html>

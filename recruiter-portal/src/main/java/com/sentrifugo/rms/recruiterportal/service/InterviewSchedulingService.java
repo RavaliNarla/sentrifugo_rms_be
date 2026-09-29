@@ -4,6 +4,7 @@ import com.sentrifugo.rms.common.exception.CommonException;
 import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
 import com.sentrifugo.rms.common.service.MailService;
 import com.sentrifugo.rms.common.service.NotificationService;
+import com.sentrifugo.rms.common.util.IstTime;
 import com.sentrifugo.rms.common.util.SecurityUtils;
 import com.sentrifugo.rms.db.entity.*;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
@@ -11,6 +12,7 @@ import com.sentrifugo.rms.db.repository.*;
 import com.sentrifugo.rms.recruiterportal.dto.InterviewScheduleListItemDTO;
 import com.sentrifugo.rms.recruiterportal.dto.MultiDayScheduleRequest;
 import com.sentrifugo.rms.recruiterportal.dto.ScheduleInterviewRequest;
+import com.sentrifugo.rms.recruiterportal.email.RmsEmailTemplates;
 import com.sentrifugo.rms.recruiterportal.util.IcsCalendarBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -61,6 +63,7 @@ public class InterviewSchedulingService {
     private final InterviewRoundMetaRepository interviewRoundMetaRepository;
     private final PanelMemberScoreRepository panelMemberScoreRepository;
     private final SecurityUtils securityUtils;
+    private final RmsEmailTemplates emailTemplates;
 
     @Value("${app.base.url}")
     private String appBaseUrl;
@@ -254,7 +257,7 @@ public class InterviewSchedulingService {
         List<InterviewScheduleEntity> saved = new ArrayList<>();
         List<PendingMail> mails = new ArrayList<>();
         InterviewPanelEntity panel = interviewPanelRepository.findById(request.getPanelId()).orElse(null);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = IstTime.now();
 
         for (int i = 0; i < candidates.size(); i++) {
             CandidateEntity candidate = candidates.get(i);
@@ -285,7 +288,8 @@ public class InterviewSchedulingService {
 
             String location = resolveLocationName(candidate);
             String positionTitle = resolvePositionTitle(candidate);
-            PendingMail mail = buildCandidateInviteEmail(candidate, slot, targetRound, panel, location, positionTitle, token);
+            PendingMail mail = buildCandidateInviteEmail(
+                    candidate, slot, targetRound, roundName, panel, location, positionTitle, token);
             if (mail != null) {
                 mails.add(mail);
             }
@@ -434,25 +438,27 @@ public class InterviewSchedulingService {
             return "SUPERSEDED";
         }
 
-        // Link valid until the day before the interview (expires on interview day and after).
+        // Link valid through the interview date inclusive (expires the day after).
         LocalDate interviewDate = schedule.getInterviewDate();
-        if (interviewDate != null && !LocalDate.now().isBefore(interviewDate)) {
+        if (interviewDate != null && com.sentrifugo.rms.common.util.IstTime.today().isAfter(interviewDate)) {
             return "EXPIRED";
         }
         UUID panelId = schedule.getPanelId();
 
         if (accept) {
             candidate.setStatus(CandidateStatus.SCHEDULED);
-            schedule.setInviteRespondedAt(LocalDateTime.now());
+            schedule.setInviteRespondedAt(IstTime.now());
             candidateRepository.save(candidate);
             interviewScheduleRepository.save(schedule);
+            notifyRecruiterOfInviteDecision(schedule, candidate, true);
             return "ACCEPTED";
         }
 
         candidate.setStatus(CandidateStatus.DECLINED);
-        schedule.setInviteRespondedAt(LocalDateTime.now());
+        schedule.setInviteRespondedAt(IstTime.now());
         candidateRepository.save(candidate);
         interviewScheduleRepository.save(schedule);
+        notifyRecruiterOfInviteDecision(schedule, candidate, false);
 
         // Free the slot: refresh panel member day counts (DECLINED no longer counts).
         List<InterviewPanelMemberEntity> members = interviewPanelMemberRepository.findByPanelId(panelId);
@@ -961,7 +967,7 @@ public class InterviewSchedulingService {
                 .orElse(null);
     }
 
-    private PendingMail buildCandidateInviteEmail(CandidateEntity candidate, Slot slot, int round,
+    private PendingMail buildCandidateInviteEmail(CandidateEntity candidate, Slot slot, int round, String roundName,
                                                   InterviewPanelEntity panel, String location,
                                                   String positionTitle, UUID token) {
         if (candidate.getEmail() == null || candidate.getEmail().isBlank()) {
@@ -969,44 +975,50 @@ public class InterviewSchedulingService {
         }
         String acceptUrl = appBaseUrl + "/api/v1/public/interviews/" + token + "/accept";
         String declineUrl = appBaseUrl + "/api/v1/public/interviews/" + token + "/decline";
-        String dateLabel = slot.date().format(DATE_FMT);
-
-        String html = "<p>Dear " + escape(candidate.getName()) + ",</p>"
-                + "<p>You are invited to an interview. Please respond using the buttons below.</p>"
-                + "<div style='background:#fff8e6;border:2px solid #e6a800;border-radius:6px;padding:14px 16px;margin:18px 0;'>"
-                + "<p style='margin:0 0 8px;font-size:15px;color:#7a5a00;'><b>Important — calendar file vs Accept button</b></p>"
-                + "<p style='margin:0;font-size:13px;color:#5c4500;line-height:1.45;'>"
-                + "The attached <b>.ics</b> file is only a <b>reminder</b> for your calendar (Outlook, Gmail, etc.). "
-                + "Opening or adding it does <b>not</b> confirm your interview. "
-                + "You must click <b>Accept Interview</b> or <b>Decline Interview</b> below in this email to record your response in our system. "
-                + "We strongly recommend saving the .ics to your calendar for a personal reminder.</p>"
-                + "</div>"
-                + "<p style='margin-top:20px;'>"
-                + "<a href='" + acceptUrl + "' style='background:#208bbd;color:#fff;padding:12px 28px;text-decoration:none;border-radius:4px;margin-right:12px;display:inline-block;font-weight:bold;'>Accept Interview</a>"
-                + "<a href='" + declineUrl + "' style='background:#a20e37;color:#fff;padding:12px 28px;text-decoration:none;border-radius:4px;display:inline-block;font-weight:bold;'>Decline Interview</a>"
-                + "</p>"
-                + "<p style='margin-top:24px;'><b>Interview details</b><br/>"
-                + "<b>Round:</b> " + round + "<br/>"
-                + (positionTitle != null ? "<b>Position:</b> " + escape(positionTitle) + "<br/>" : "")
-                + "<b>Date:</b> " + dateLabel + "<br/>"
-                + "<b>Time:</b> " + slot.start() + " – " + slot.end() + "<br/>"
-                + "<b>Interview Location:</b> " + escape(location != null ? location : "-") + "<br/>"
-                + "<b>Panel:</b> " + escape(panel != null ? panel.getName() : "-") + "</p>"
-                + "<p style='color:#888;font-size:12px;margin-top:16px;'>If you receive a newer invite email, earlier Accept / Decline links will no longer work.</p>";
-
+        String resolvedRoundName = roundName;
+        if (resolvedRoundName == null || resolvedRoundName.isBlank()) {
+            InterviewRoundMetaEntity meta = interviewRoundMetaRepository
+                    .findByCandidateIdAndRound(candidate.getId(), round).orElse(null);
+            if (meta != null && meta.getRoundName() != null && !meta.getRoundName().isBlank()) {
+                resolvedRoundName = meta.getRoundName();
+            }
+        }
+        RmsEmailTemplates.BuiltEmail email = emailTemplates.interviewInvite(
+                candidate.getName(), positionTitle, round, resolvedRoundName,
+                slot.date(), slot.start(), slot.end(), location,
+                panel != null ? panel.getName() : null, acceptUrl, declineUrl);
         IcsCalendarBuilder.Event event = new IcsCalendarBuilder.Event(
                 token + "@invite.sentrifugo-rms",
-                "Interview" + (positionTitle != null ? " — " + positionTitle : "") + " (Round " + round + ")",
+                "Interview" + (positionTitle != null ? " — " + positionTitle : "")
+                        + " (Round " + round
+                        + (resolvedRoundName != null && !resolvedRoundName.isBlank() ? " – " + resolvedRoundName : "")
+                        + ")",
                 "Please use Accept / Decline in your invite email to confirm. This calendar entry is a reminder only.",
-                location,
-                slot.date(),
-                slot.start(),
-                slot.end()
-        );
+                location, slot.date(), slot.start(), slot.end());
         byte[] ics = IcsCalendarBuilder.singleEventIcs(event);
         List<MailService.Attachment> attachments = List.of(
                 new MailService.Attachment("interview-invite.ics", ics, IcsCalendarBuilder.CONTENT_TYPE));
-        return new PendingMail(candidate.getEmail(), "Interview Invitation - Round " + round, html, attachments);
+        return new PendingMail(candidate.getEmail(), email.subject(), email.html(), attachments);
+    }
+
+    private void notifyRecruiterOfInviteDecision(InterviewScheduleEntity schedule, CandidateEntity candidate, boolean accepted) {
+        try {
+            UUID recruiterId = schedule.getCreatedBy() != null ? schedule.getCreatedBy() : schedule.getModifiedBy();
+            if (recruiterId == null) {
+                return;
+            }
+            UserEntity recruiter = userRepository.findById(recruiterId).orElse(null);
+            if (recruiter == null || recruiter.getEmail() == null || recruiter.getEmail().isBlank()) {
+                return;
+            }
+            String positionTitle = resolvePositionTitle(candidate);
+            int round = schedule.getRound() != null ? schedule.getRound() : 1;
+            RmsEmailTemplates.BuiltEmail email = emailTemplates.recruiterInviteResponse(
+                    recruiter.getName(), candidate.getName(), positionTitle, round, schedule.getRoundName(), accepted);
+            emailTemplates.sendAsync(recruiter.getEmail(), email);
+        } catch (Exception e) {
+            log.warn("Failed to notify recruiter of invite decision: {}", e.getMessage());
+        }
     }
 
     private PendingMail buildPanelInviteEmail(UserEntity user, LocalDate interviewDate, int dayCount,
@@ -1014,26 +1026,14 @@ public class InterviewSchedulingService {
         if (user.getEmail() == null || user.getEmail().isBlank() || dayEvents == null || dayEvents.isEmpty()) {
             return null;
         }
-        String day = interviewDate.format(DATE_FMT);
-        String html = "<p>Hi " + escape(user.getName()) + ",</p>"
-                + "<p>You have <b>" + dayCount + "</b> interview" + (dayCount == 1 ? "" : "s")
-                + " on <b>" + day + "</b>.</p>"
-                + "<div style='background:#fff8e6;border:2px solid #e6a800;border-radius:6px;padding:14px 16px;margin:18px 0;'>"
-                + "<p style='margin:0 0 8px;font-size:15px;color:#7a5a00;'><b>Calendar reminder (.ics)</b></p>"
-                + "<p style='margin:0;font-size:13px;color:#5c4500;line-height:1.45;'>"
-                + "Attached is a calendar file with your candidate slot(s) for this day. "
-                + "Please add it to Outlook, Gmail, or your preferred calendar as a personal reminder. "
-                + "Candidate Accept / Decline is handled separately in their invite email — this file does not collect RSVPs.</p>"
-                + "</div>"
-                + "<p>Please log in to Sagar Recruitment Hub for full details. "
-                + "Candidates appear on your interview list only after they <b>Accept</b> the invite.</p>";
-
+        String day = IstTime.fmtDate(interviewDate);
+        RmsEmailTemplates.BuiltEmail email = emailTemplates.panelDaySchedule(user.getName(), day, dayCount);
         List<IcsCalendarBuilder.NamedIcs> files = IcsCalendarBuilder.multiEventIcsFiles(
                 "interviews-" + interviewDate, dayEvents);
         List<MailService.Attachment> attachments = files.stream()
                 .map(f -> new MailService.Attachment(f.fileName(), f.bytes(), IcsCalendarBuilder.CONTENT_TYPE))
                 .toList();
-        return new PendingMail(user.getEmail(), "Interview scheduled — " + day, html, attachments);
+        return new PendingMail(user.getEmail(), email.subject(), email.html(), attachments);
     }
 
     private static String escape(String value) {

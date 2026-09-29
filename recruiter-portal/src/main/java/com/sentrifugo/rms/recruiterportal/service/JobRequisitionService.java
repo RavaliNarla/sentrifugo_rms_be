@@ -36,6 +36,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.sentrifugo.rms.common.util.IstTime;
+import com.sentrifugo.rms.recruiterportal.email.RmsEmailTemplates;
 
 @Slf4j
 @Service
@@ -50,6 +52,7 @@ public class JobRequisitionService {
     private final SecurityUtils securityUtils;
     private final MailService mailService;
     private final NotificationService notificationService;
+    private final RmsEmailTemplates emailTemplates;
 
     @Transactional
     public JobRequisitionDTO create(JobRequisitionDTO dto) {
@@ -85,7 +88,7 @@ public class JobRequisitionService {
 
     /** SCL_02: Start Date and Expected Fulfilment Date must both be future dates (and fulfilment on/after start). */
     private void validateDates(JobRequisitionDTO dto) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = IstTime.today();
         if (dto.getStartDate() != null && dto.getStartDate().isBefore(today)) {
             throw new CommonException("Start Date must be a future date.");
         }
@@ -194,7 +197,7 @@ public class JobRequisitionService {
             recordHistory(requisition.getId(), currentUserId, actorName, RequisitionStatus.L1_PENDING.name(), null);
         }
         jobRequisitionRepository.saveAll(requisitions);
-        notifyApprover(ApproverRole.L1, "Requisition(s) submitted for your L1 approval.");
+        notifyApproversBothLevels("Requisition(s) pending approval");
 
         // Build in-app notifications after status save; emails are async and do not block this API.
         List<JobPositionEntity> allPositions = jobPositionRepository.findByRequisitionIdIn(requisitionIds);
@@ -243,8 +246,19 @@ public class JobRequisitionService {
         }
         jobRequisitionRepository.saveAll(requisitions);
 
-        if (approver.getApproverRole() == ApproverRole.L1 && request.isApprove()) {
-            notifyApprover(ApproverRole.L2, "Requisition(s) approved by L1, awaiting your L2 approval.");
+        for (JobRequisitionEntity req : requisitions) {
+            String label = req.getRequisitionCode() != null ? req.getRequisitionCode() : req.getTitle();
+            UUID submitter = req.getCreatedBy();
+            if (approver.getApproverRole() == ApproverRole.L1) {
+                if (request.isApprove()) {
+                    notifyUsersAboutDecision(ApproverRole.L2, submitter, label, "L1", true, "Awaiting your L2 approval.");
+                } else {
+                    notifyUsersAboutDecision(null, submitter, label, "L1", false, "The requisition was rejected at L1.");
+                }
+            } else {
+                notifyUsersAboutDecision(null, submitter, label, "L2", request.isApprove(),
+                        request.isApprove() ? "The requisition is now approved." : "The requisition was rejected at L2.");
+            }
         }
     }
 
@@ -289,22 +303,58 @@ public class JobRequisitionService {
         return userRepository.findById(userId).map(UserEntity::getName).orElse("Unknown");
     }
 
-    private void notifyApprover(ApproverRole role, String message) {
+    private void notifyApprover(ApproverRole role, String itemLabel, String level) {
         try {
             List<RequisitionApproverEntity> approvers = requisitionApproverRepository.findByApproverRole(role);
             for (RequisitionApproverEntity approver : approvers) {
                 Optional<UserEntity> user = userRepository.findById(approver.getApproverId());
-                user.ifPresent(u -> mailService.sendHtmlEmailAsync(u.getEmail(), "Requisition Approval Pending",
-                        "<p>Hi " + u.getName() + ",</p><p>" + message + " Please log in to the Sentrifugo RMS Recruiter Portal to review.</p>"));
+                user.ifPresent(u -> {
+                    if (u.getEmail() != null) {
+                        emailTemplates.sendAsync(u.getEmail(),
+                                emailTemplates.approverSubmission(u.getName(), "Requisition", itemLabel, level));
+                    }
+                });
             }
         } catch (Exception e) {
-            log.warn("Failed to send approver notification email: {}", e.getMessage());
+            log.warn("Failed to notify {} requisition approvers: {}", role, e.getMessage());
         }
     }
 
+    private void notifyApproversBothLevels(String itemLabel) {
+        notifyApprover(ApproverRole.L1, itemLabel, "L1");
+        notifyApprover(ApproverRole.L2, itemLabel, "L2");
+    }
+
+    private void notifyUsersAboutDecision(ApproverRole nextRoleOrNull, UUID submitterId, String itemLabel,
+                                          String decidedByLevel, boolean approved, String nextHint) {
+        try {
+            if (nextRoleOrNull != null) {
+                for (RequisitionApproverEntity approver : requisitionApproverRepository.findByApproverRole(nextRoleOrNull)) {
+                    userRepository.findById(approver.getApproverId()).ifPresent(u -> {
+                        if (u.getEmail() != null) {
+                            emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
+                                    u.getName(), "Requisition", itemLabel, decidedByLevel, approved, nextHint));
+                        }
+                    });
+                }
+            }
+            if (submitterId != null) {
+                userRepository.findById(submitterId).ifPresent(u -> {
+                    if (u.getEmail() != null) {
+                        emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
+                                u.getName(), "Requisition", itemLabel, decidedByLevel, approved, nextHint));
+                    }
+                });
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send requisition decision emails: {}", e.getMessage());
+        }
+    }
+
+
     private String generateRequisitionCode() {
         Long seq = jobRequisitionRepository.nextRequisitionCodeSeq();
-        return "REQ-" + LocalDate.now().getYear() + "-" + String.format("%05d", seq);
+        return "REQ-" + IstTime.today().getYear() + "-" + String.format("%05d", seq);
     }
 
     private JobRequisitionDTO toDto(JobRequisitionEntity entity) {

@@ -44,7 +44,17 @@ public class PanelMemberScoreEntity extends BaseEntity<UUID> {
     @Column(name = "rationale", columnDefinition = "TEXT")
     private String rationale;
 
-    /** SELECT / REJECT / HOLD. */
+    /** SELECT / REJECT / HOLD (legacy) or STRONG_HIRE / HIRE / HOLD / DO_NOT_HIRE. */
     @Column(name = "decision")
     private String decision;
+
+    /**
+     * Optional competency ratings JSON, e.g.
+     * {"TECHNICAL_KNOWLEDGE":4,"RELEVANT_EXPERIENCE":3,"COMMUNICATION":5,"PROBLEM_SOLVING":4,"ATTITUDE_APPROACH":5}
+     */
+    @Column(name = "competency_json", columnDefinition = "TEXT")
+    private String competencyJson;
+
+    @Column(name = "key_observations", columnDefinition = "TEXT")
+    private String keyObservations;
 }

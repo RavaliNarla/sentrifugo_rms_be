@@ -35,6 +35,9 @@ public class InterviewScheduleDTO {
     private BigDecimal myScore;
     private String myRationale;
     private String myDecision;
+    /** Competency ratings map (1–5) previously saved by this interviewer, if any. */
+    private java.util.Map<String, Integer> myCompetencyRatings;
+    private String myKeyObservations;
 
     /** Per-interviewer breakdown for the current round (kept for compatibility). */
     private java.util.List<PanelMemberScoreViewDTO> memberScores;

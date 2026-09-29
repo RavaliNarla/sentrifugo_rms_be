@@ -35,6 +35,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import com.sentrifugo.rms.common.util.IstTime;
+import com.sentrifugo.rms.recruiterportal.email.RmsEmailTemplates;
 
 /**
  * Offer letter generation + the retained Offer-Letter approval workflow
@@ -65,11 +67,12 @@ public class OfferService {
     private final MailService mailService;
     private final SecurityUtils securityUtils;
     private final NotificationService notificationService;
+    private final RmsEmailTemplates emailTemplates;
 
     @Value("${app.base.url}")
     private String appBaseUrl;
 
-    @Value("${app.company.name:Sentrifugo}")
+    @Value("${app.company.name:Sagar Cements Limited}")
     private String companyName;
 
     /** SCL_41: only accepted/rejected offers are locked; everything else can be regenerated and resent. */
@@ -92,7 +95,7 @@ public class OfferService {
         OfferTemplateEntity template = offerTemplateRepository.findById(request.getTemplateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Offer template not found"));
 
-        if (request.getAcceptBeforeDate().isBefore(LocalDate.now().plusDays(1))) {
+        if (request.getAcceptBeforeDate().isBefore(IstTime.today().plusDays(1))) {
             throw new CommonException("Accept Before Date must be a future date.");
         }
 
@@ -161,8 +164,8 @@ public class OfferService {
         CandidateEntity candidate = candidateRepository.findById(request.getCandidateId())
                 .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
         // Candidate selected but dates still optional in preview - fall back to sample dates only for rendering.
-        LocalDate accept = acceptBefore != null ? acceptBefore : LocalDate.now().plusDays(3);
-        LocalDate join = joining != null ? joining : LocalDate.now().plusDays(14);
+        LocalDate accept = acceptBefore != null ? acceptBefore : IstTime.today().plusDays(3);
+        LocalDate join = joining != null ? joining : IstTime.today().plusDays(14);
         return renderOfferHtml(candidate, template, accept, join);
     }
 
@@ -180,7 +183,7 @@ public class OfferService {
             recordHistory(offer.getId(), currentUserId, actorName, OfferStatus.L1_PENDING.name(), null);
         }
         candidateOfferRepository.saveAll(offers);
-        notifyApprover(ApproverRole.L1, "Offer letter(s) submitted for your L1 approval.");
+        notifyApproversBothLevels("Offer letter(s) pending approval");
 
         for (CandidateOfferEntity offer : offers) {
             CandidateEntity candidate = candidateRepository.findById(offer.getCandidateId()).orElse(null);
@@ -233,8 +236,20 @@ public class OfferService {
         }
         candidateOfferRepository.saveAll(offers);
 
-        if (approver.getApproverRole() == ApproverRole.L1 && anyL1Approved) {
-            notifyApprover(ApproverRole.L2, "Offer letter(s) approved by L1, awaiting your L2 approval.");
+        for (CandidateOfferEntity o : offers) {
+            UUID submitter = o.getCreatedBy();
+            String label = "Offer letter";
+            if (approver.getApproverRole() == ApproverRole.L1) {
+                if (o.getStatus() == OfferStatus.L2_PENDING) {
+                    notifyUsersAboutDecision(ApproverRole.L2, submitter, label, "L1", true, "Awaiting your L2 approval.");
+                } else if (o.getStatus() == OfferStatus.L1_REJECTED) {
+                    notifyUsersAboutDecision(null, submitter, label, "L1", false, "The offer was rejected at L1.");
+                }
+            } else if (o.getStatus() == OfferStatus.L2_REJECTED) {
+                notifyUsersAboutDecision(null, submitter, label, "L2", false, "The offer was rejected at L2.");
+            } else if (o.getStatus() == OfferStatus.SENT) {
+                notifyUsersAboutDecision(null, submitter, label, "L2", true, "The offer was approved and emailed to the candidate.");
+            }
         }
     }
 
@@ -279,7 +294,7 @@ public class OfferService {
         archiveAcceptToken(offer);
         offer.setStatus(OfferStatus.SENT);
         offer.setAcceptToken(UUID.randomUUID());
-        offer.setSentDate(LocalDateTime.now());
+        offer.setSentDate(IstTime.now());
         offer.setDecidedDate(null);
 
         try {
@@ -346,14 +361,14 @@ public class OfferService {
             return "SUPERSEDED";
         }
 
-        if (LocalDate.now().isAfter(offer.getAcceptBeforeDate())) {
+        if (IstTime.today().isAfter(offer.getAcceptBeforeDate())) {
             offer.setStatus(OfferStatus.EXPIRED);
             candidateOfferRepository.save(offer);
             return "EXPIRED";
         }
 
         offer.setStatus(accept ? OfferStatus.ACCEPTED : OfferStatus.REJECTED);
-        offer.setDecidedDate(LocalDateTime.now());
+        offer.setDecidedDate(IstTime.now());
         candidateOfferRepository.save(offer);
         sendOfferDecisionThankYou(offer, accept);
         return offer.getStatus().name();
@@ -365,25 +380,28 @@ public class OfferService {
             if (candidate == null || candidate.getEmail() == null || candidate.getEmail().isBlank()) {
                 return;
             }
-            String name = candidate.getName() != null ? candidate.getName() : "Candidate";
-            String subject;
-            String html;
-            if (accept) {
-                subject = "Thank you — offer accepted";
-                html = "<p>Dear " + name + ",</p>"
-                        + "<p>Thank you for accepting our offer. We are delighted to welcome you aboard.</p>"
-                        + "<p>Our team will be in touch with next steps regarding joining formalities"
-                        + (offer.getJoiningDate() != null ? " (joining date: <b>" + offer.getJoiningDate() + "</b>)" : "")
-                        + ".</p>"
-                        + "<p>Warm regards,<br/>Sagar Recruitment Hub</p>";
-            } else {
-                subject = "Thank you — offer response received";
-                html = "<p>Dear " + name + ",</p>"
-                        + "<p>Thank you for letting us know your decision on the offer.</p>"
-                        + "<p>We appreciate the time you spent with us and wish you the very best in your future endeavours.</p>"
-                        + "<p>Warm regards,<br/>Sagar Recruitment Hub</p>";
+            JobPositionEntity position = jobPositionRepository.findById(candidate.getPositionId()).orElse(null);
+            String designation = position != null
+                    ? positionTitleRepository.findById(position.getPositionTitleId()).map(x -> x.getName()).orElse("-")
+                    : "-";
+            String location = position != null
+                    ? locationRepository.findById(position.getLocationId()).map(x -> x.getName()).orElse("-")
+                    : "-";
+            RmsEmailTemplates.BuiltEmail toCandidate = accept
+                    ? emailTemplates.offerAccepted(candidate.getName(), designation, location, offer.getJoiningDate())
+                    : emailTemplates.offerDeclined(candidate.getName(), designation);
+            emailTemplates.sendAsync(candidate.getEmail(), toCandidate, true,
+                    accept ? "offer-acceptance.pdf" : "offer-acknowledgement.pdf");
+
+            UUID recruiterId = offer.getCreatedBy() != null ? offer.getCreatedBy() : offer.getModifiedBy();
+            if (recruiterId != null) {
+                userRepository.findById(recruiterId).ifPresent(u -> {
+                    if (u.getEmail() != null && !u.getEmail().isBlank()) {
+                        emailTemplates.sendAsync(u.getEmail(),
+                                emailTemplates.recruiterOfferResponse(u.getName(), candidate.getName(), designation, accept));
+                    }
+                });
             }
-            mailService.sendHtmlEmailAsync(candidate.getEmail(), subject, html);
         } catch (Exception e) {
             log.warn("Failed to send offer decision thank-you email: {}", e.getMessage());
         }
@@ -430,36 +448,73 @@ public class OfferService {
         try {
             String acceptUrl = appBaseUrl + "/api/v1/public/offers/" + offer.getAcceptToken() + "/accept";
             String rejectUrl = appBaseUrl + "/api/v1/public/offers/" + offer.getAcceptToken() + "/reject";
-
-            String html = "<p>Dear " + candidate.getName() + ",</p>"
-                    + "<p>Please find attached your offer letter. Kindly respond on or before <b>"
-                    + offer.getAcceptBeforeDate() + "</b>.</p>"
-                    + "<p><b>Joining Date:</b> " + (offer.getJoiningDate() != null ? offer.getJoiningDate() : "-") + "</p>"
-                    + "<p style='margin-top:20px;'>"
-                    + "<a href='" + acceptUrl + "' style='background:#208bbd;color:#fff;padding:10px 24px;text-decoration:none;border-radius:4px;margin-right:12px;'>Accept Offer</a>"
-                    + "<a href='" + rejectUrl + "' style='background:#a20e37;color:#fff;padding:10px 24px;text-decoration:none;border-radius:4px;'>Reject Offer</a>"
-                    + "</p>"
-                    + "<p style='color:#888;font-size:12px;margin-top:16px;'>This link will expire after " + offer.getAcceptBeforeDate()
-                    + ". If you receive a newer offer email, earlier links will no longer work.</p>";
-
-            mailService.sendHtmlEmail(candidate.getEmail(), "Your Offer Letter", html, pdfBytes, "offer-letter.pdf");
-        } catch (Exception e) {
-            log.warn("Failed to send offer email: {}", e.getMessage());
+            JobPositionEntity position = jobPositionRepository.findById(candidate.getPositionId()).orElse(null);
+            String designation = position != null
+                    ? positionTitleRepository.findById(position.getPositionTitleId()).map(x -> x.getName()).orElse("-")
+                    : "-";
+            String location = position != null
+                    ? locationRepository.findById(position.getLocationId()).map(x -> x.getName()).orElse("-")
+                    : "-";
+            RmsEmailTemplates.BuiltEmail email = emailTemplates.offerLetter(
+                    candidate.getName(), designation, location,
+                    offer.getJoiningDate(), offer.getAcceptBeforeDate(),
+                    acceptUrl, rejectUrl, null);
+            List<MailService.Attachment> attachments = List.of(
+                    new MailService.Attachment("offer-letter.pdf", pdfBytes, "application/pdf"));
+            emailTemplates.sendSyncWithAttachments(candidate.getEmail(), email, attachments);
+        } catch (Exception ex) {
+            log.warn("Failed to send offer email: {}", ex.getMessage());
         }
     }
 
-    private void notifyApprover(ApproverRole role, String message) {
+    private void notifyApprover(ApproverRole role, String itemLabel, String level) {
         try {
             List<RequisitionApproverEntity> approvers = requisitionApproverRepository.findByApproverRole(role);
             for (RequisitionApproverEntity approver : approvers) {
                 Optional<UserEntity> user = userRepository.findById(approver.getApproverId());
-                user.ifPresent(u -> mailService.sendHtmlEmailAsync(u.getEmail(), "Offer Letter Approval Pending",
-                        "<p>Hi " + u.getName() + ",</p><p>" + message + " Please log in to the Sentrifugo RMS Recruiter Portal to review.</p>"));
+                user.ifPresent(u -> {
+                    if (u.getEmail() != null) {
+                        emailTemplates.sendAsync(u.getEmail(),
+                                emailTemplates.approverSubmission(u.getName(), "Offer letter", itemLabel, level));
+                    }
+                });
             }
         } catch (Exception e) {
-            log.warn("Failed to send offer approver notification email: {}", e.getMessage());
+            log.warn("Failed to notify {} offer approvers: {}", role, e.getMessage());
         }
     }
+
+    private void notifyApproversBothLevels(String itemLabel) {
+        notifyApprover(ApproverRole.L1, itemLabel, "L1");
+        notifyApprover(ApproverRole.L2, itemLabel, "L2");
+    }
+
+    private void notifyUsersAboutDecision(ApproverRole nextRoleOrNull, UUID submitterId, String itemLabel,
+                                          String decidedByLevel, boolean approved, String nextHint) {
+        try {
+            if (nextRoleOrNull != null) {
+                for (RequisitionApproverEntity approver : requisitionApproverRepository.findByApproverRole(nextRoleOrNull)) {
+                    userRepository.findById(approver.getApproverId()).ifPresent(u -> {
+                        if (u.getEmail() != null) {
+                            emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
+                                    u.getName(), "Offer letter", itemLabel, decidedByLevel, approved, nextHint));
+                        }
+                    });
+                }
+            }
+            if (submitterId != null) {
+                userRepository.findById(submitterId).ifPresent(u -> {
+                    if (u.getEmail() != null) {
+                        emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
+                                u.getName(), "Offer letter", itemLabel, decidedByLevel, approved, nextHint));
+                    }
+                });
+            }
+        } catch (Exception e) {
+            log.warn("Failed to send offer decision emails: {}", e.getMessage());
+        }
+    }
+
 
     private CandidateOfferDTO toDto(CandidateOfferEntity entity, CandidateEntity candidate) {
         String positionTitleName = null;

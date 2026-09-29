@@ -48,6 +48,8 @@ public class CandidateDTO {
 
     private String status;
     private Integer interviewRound;
+    /** Latest offer status when candidate is in the offer pool; used for live labels in Candidate Pool. */
+    private String offerStatus;
     private BigDecimal finalScore;
 
     private BigDecimal salary;

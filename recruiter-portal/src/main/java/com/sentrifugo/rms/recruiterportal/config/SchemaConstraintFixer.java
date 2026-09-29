@@ -163,5 +163,13 @@ public class SchemaConstraintFixer implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("Could not ensure notifications.source_user_id: {}", e.getMessage());
         }
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE recruitment.panel_member_scores ADD COLUMN IF NOT EXISTS competency_json text");
+            jdbcTemplate.execute("ALTER TABLE recruitment.panel_member_scores ADD COLUMN IF NOT EXISTS key_observations text");
+            log.info("Ensured recruitment.panel_member_scores competency columns");
+        } catch (Exception e) {
+            log.warn("Could not ensure panel_member_scores competency columns: {}", e.getMessage());
+        }
     }
 }
