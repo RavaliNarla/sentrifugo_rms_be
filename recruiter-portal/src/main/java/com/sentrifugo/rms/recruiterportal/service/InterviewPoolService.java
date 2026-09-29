@@ -340,6 +340,8 @@ public class InterviewPoolService {
                             .score(s.getScore())
                             .rationale(s.getRationale())
                             .decision(s.getDecision())
+                            .competencyRatings(parseCompetencyJson(s.getCompetencyJson()))
+                            .keyObservations(s.getKeyObservations())
                             .build());
                 }
             }
@@ -418,6 +420,8 @@ public class InterviewPoolService {
                                     .score(s.getScore())
                                     .rationale(s.getRationale())
                                     .decision(s.getDecision())
+                                    .competencyRatings(parseCompetencyJson(s.getCompetencyJson()))
+                                    .keyObservations(s.getKeyObservations())
                                     .build())
                             .toList();
                     return InterviewRoundFeedbackDTO.builder()
