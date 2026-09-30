@@ -43,8 +43,10 @@ public class UserCredentialBackfill implements ApplicationRunner {
 
         Integer maxSeq = userRepository.findMaxEmployeeSequence();
         int nextSeq = (maxSeq == null ? 0 : maxSeq) + 1;
+        // One shared BCrypt hash for the current default; applied to every account that is not already on it.
         String defaultHash = passwordEncoder.encode(AppConstants.DEFAULT_USER_PASSWORD);
         int updated = 0;
+        int passwordsReset = 0;
 
         for (UserEntity user : users) {
             boolean dirty = false;
@@ -52,9 +54,13 @@ public class UserCredentialBackfill implements ApplicationRunner {
                 user.setEmployeeId(String.format("EMP%04d", nextSeq++));
                 dirty = true;
             }
-            if (user.getPasswordHash() == null || user.getPasswordHash().isBlank()) {
+            String existingHash = user.getPasswordHash();
+            boolean needsPassword = existingHash == null || existingHash.isBlank()
+                    || !passwordEncoder.matches(AppConstants.DEFAULT_USER_PASSWORD, existingHash);
+            if (needsPassword) {
                 user.setPasswordHash(defaultHash);
                 dirty = true;
+                passwordsReset++;
             }
             if (dirty) {
                 userRepository.save(user);
@@ -62,8 +68,8 @@ public class UserCredentialBackfill implements ApplicationRunner {
             }
         }
         if (updated > 0) {
-            log.info("Backfilled employeeId/password for {} user(s). Default password: {}",
-                    updated, AppConstants.DEFAULT_USER_PASSWORD);
+            log.info("Backfilled credentials for {} user(s) ({} password(s) set to default).",
+                    updated, passwordsReset);
         }
     }
 }

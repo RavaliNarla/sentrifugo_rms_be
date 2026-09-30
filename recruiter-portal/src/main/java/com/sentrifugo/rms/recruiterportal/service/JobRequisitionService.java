@@ -7,6 +7,8 @@ import com.sentrifugo.rms.common.service.NotificationService;
 import com.sentrifugo.rms.common.util.SecurityUtils;
 import com.sentrifugo.rms.db.entity.JobPositionEntity;
 import com.sentrifugo.rms.db.entity.JobRequisitionEntity;
+import com.sentrifugo.rms.db.entity.LocationEntity;
+import com.sentrifugo.rms.db.entity.PositionTitleEntity;
 import com.sentrifugo.rms.db.entity.RequisitionApprovalHistoryEntity;
 import com.sentrifugo.rms.db.entity.RequisitionApproverEntity;
 import com.sentrifugo.rms.db.entity.UserEntity;
@@ -14,6 +16,8 @@ import com.sentrifugo.rms.db.enums.ApproverRole;
 import com.sentrifugo.rms.db.enums.RequisitionStatus;
 import com.sentrifugo.rms.db.repository.JobPositionRepository;
 import com.sentrifugo.rms.db.repository.JobRequisitionRepository;
+import com.sentrifugo.rms.db.repository.LocationRepository;
+import com.sentrifugo.rms.db.repository.PositionTitleRepository;
 import com.sentrifugo.rms.db.repository.RequisitionApprovalHistoryRepository;
 import com.sentrifugo.rms.db.repository.RequisitionApproverRepository;
 import com.sentrifugo.rms.db.repository.UserRepository;
@@ -50,6 +54,8 @@ public class JobRequisitionService {
 
     private final JobRequisitionRepository jobRequisitionRepository;
     private final JobPositionRepository jobPositionRepository;
+    private final PositionTitleRepository positionTitleRepository;
+    private final LocationRepository locationRepository;
     private final RequisitionApproverRepository requisitionApproverRepository;
     private final RequisitionApprovalHistoryRepository approvalHistoryRepository;
     private final UserRepository userRepository;
@@ -205,7 +211,9 @@ public class JobRequisitionService {
             recordHistory(requisition.getId(), currentUserId, actorName, RequisitionStatus.L1_PENDING.name(), null);
         }
         jobRequisitionRepository.saveAll(requisitions);
-        notifyApproversBothLevels("Requisition(s) pending approval");
+        for (JobRequisitionEntity req : requisitions) {
+            notifyApproversBothLevels(resolveRequisitionHiringDetails(req));
+        }
 
         // Build in-app notifications after status save; emails are async and do not block this API.
         List<JobPositionEntity> allPositions = jobPositionRepository.findByRequisitionIdIn(requisitionIds);
@@ -255,19 +263,38 @@ public class JobRequisitionService {
         jobRequisitionRepository.saveAll(requisitions);
 
         for (JobRequisitionEntity req : requisitions) {
-            String label = req.getRequisitionCode() != null ? req.getRequisitionCode() : req.getTitle();
             List<UUID> owners = resolveOwnerRecipients(req);
+            RmsEmailTemplates.HiringDetails details = resolveRequisitionHiringDetails(req);
             if (approver.getApproverRole() == ApproverRole.L1) {
                 if (request.isApprove()) {
-                    notifyUsersAboutDecision(ApproverRole.L2, owners, label, "L1", true, "Awaiting your L2 approval.");
+                    notifyUsersAboutDecision(ApproverRole.L2, owners, "L1", true, "Awaiting your L2 approval.", details);
                 } else {
-                    notifyUsersAboutDecision(null, owners, label, "L1", false, "The requisition was rejected at L1.");
+                    notifyUsersAboutDecision(null, owners, "L1", false, "The requisition was rejected at L1.", details);
                 }
             } else {
-                notifyUsersAboutDecision(null, owners, label, "L2", request.isApprove(),
-                        request.isApprove() ? "The requisition is now approved." : "The requisition was rejected at L2.");
+                notifyUsersAboutDecision(null, owners, "L2", request.isApprove(),
+                        request.isApprove() ? "The requisition is now approved." : "The requisition was rejected at L2.",
+                        details);
             }
         }
+    }
+
+    private RmsEmailTemplates.HiringDetails resolveRequisitionHiringDetails(JobRequisitionEntity req) {
+        String reqCode = req.getRequisitionCode() != null ? req.getRequisitionCode() : req.getTitle();
+        List<JobPositionEntity> positions = jobPositionRepository.findByRequisitionId(req.getId());
+        String positionNames = positions.stream()
+                .map(p -> positionTitleRepository.findById(p.getPositionTitleId()).map(PositionTitleEntity::getName).orElse(null))
+                .filter(n -> n != null && !n.isBlank())
+                .distinct()
+                .collect(Collectors.joining(", "));
+        String locationNames = positions.stream()
+                .map(p -> locationRepository.findById(p.getLocationId()).map(LocationEntity::getName).orElse(null))
+                .filter(n -> n != null && !n.isBlank())
+                .distinct()
+                .collect(Collectors.joining(", "));
+        return RmsEmailTemplates.HiringDetails.of(null, reqCode,
+                positionNames.isBlank() ? null : positionNames,
+                locationNames.isBlank() ? null : locationNames);
     }
 
     /**
@@ -329,7 +356,7 @@ public class JobRequisitionService {
         return userRepository.findById(userId).map(UserEntity::getName).orElse("Unknown");
     }
 
-    private void notifyApprover(ApproverRole role, String itemLabel, String level) {
+    private void notifyApprover(ApproverRole role, RmsEmailTemplates.HiringDetails details, String level) {
         try {
             List<RequisitionApproverEntity> approvers = requisitionApproverRepository.findByApproverRole(role);
             for (RequisitionApproverEntity approver : approvers) {
@@ -337,7 +364,7 @@ public class JobRequisitionService {
                 user.ifPresent(u -> {
                     if (u.getEmail() != null) {
                         emailTemplates.sendAsync(u.getEmail(),
-                                emailTemplates.approverSubmission(u.getName(), "Requisition", itemLabel, level));
+                                emailTemplates.approverSubmission(u.getName(), "Requisition", level, details));
                     }
                 });
             }
@@ -346,13 +373,14 @@ public class JobRequisitionService {
         }
     }
 
-    private void notifyApproversBothLevels(String itemLabel) {
-        notifyApprover(ApproverRole.L1, itemLabel, "L1");
-        notifyApprover(ApproverRole.L2, itemLabel, "L2");
+    private void notifyApproversBothLevels(RmsEmailTemplates.HiringDetails details) {
+        notifyApprover(ApproverRole.L1, details, "L1");
+        notifyApprover(ApproverRole.L2, details, "L2");
     }
 
-    private void notifyUsersAboutDecision(ApproverRole nextRoleOrNull, Collection<UUID> ownerIds, String itemLabel,
-                                          String decidedByLevel, boolean approved, String nextHint) {
+    private void notifyUsersAboutDecision(ApproverRole nextRoleOrNull, Collection<UUID> ownerIds,
+                                          String decidedByLevel, boolean approved, String nextHint,
+                                          RmsEmailTemplates.HiringDetails details) {
         try {
             Set<String> sentEmails = new HashSet<>();
             if (nextRoleOrNull != null) {
@@ -360,7 +388,7 @@ public class JobRequisitionService {
                     userRepository.findById(approver.getApproverId()).ifPresent(u -> {
                         if (u.getEmail() != null && sentEmails.add(u.getEmail().trim().toLowerCase())) {
                             emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
-                                    u.getName(), "Requisition", itemLabel, decidedByLevel, approved, nextHint));
+                                    u.getName(), "Requisition", decidedByLevel, approved, nextHint, details));
                         }
                     });
                 }
@@ -373,7 +401,7 @@ public class JobRequisitionService {
                     userRepository.findById(ownerId).ifPresent(u -> {
                         if (u.getEmail() != null && sentEmails.add(u.getEmail().trim().toLowerCase())) {
                             emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
-                                    u.getName(), "Requisition", itemLabel, decidedByLevel, approved, nextHint));
+                                    u.getName(), "Requisition", decidedByLevel, approved, nextHint, details));
                         }
                     });
                 }

@@ -3,64 +3,114 @@
 <head>
     <meta charset="UTF-8"/>
     <style>
-        body { font-family: "Times New Roman", Times, serif; color: #111; padding: 36px 42px; font-size: 13px; line-height: 1.45; }
-        .brand { color: #14532d; font-size: 20px; font-weight: 700; letter-spacing: 0.4px; margin: 0; font-family: Arial, Helvetica, sans-serif; }
-        .sub { color: #1b7a3d; font-size: 12px; margin: 2px 0 14px; font-family: Arial, Helvetica, sans-serif; }
-        .meta { font-size: 12px; margin-bottom: 8px; }
-        .conf { font-weight: 700; text-transform: uppercase; margin: 12px 0 16px; font-size: 12px; }
-        .subject { font-weight: 700; text-decoration: underline; margin: 14px 0; }
-        ol { padding-left: 18px; }
-        ol li { margin-bottom: 8px; }
-        table.details { width: 100%; border-collapse: collapse; margin: 14px 0 18px; }
-        table.details td { padding: 7px 10px; border: 1px solid #c5d0c8; font-size: 12px; }
-        table.details td.label { background: #eef6f0; font-weight: 700; width: 38%; }
+        body { font-family: "Times New Roman", Times, serif; color: #111; padding: 36px 42px; font-size: 13px; line-height: 1.5; }
+        .brand { color: #14532d; font-size: 18px; font-weight: 700; letter-spacing: 0.5px; margin: 0 0 16px; font-family: Arial, Helvetica, sans-serif; text-transform: uppercase; }
+        .meta { font-size: 13px; margin: 0 0 4px; }
+        .conf { font-weight: 700; text-transform: uppercase; margin: 16px 0 18px; font-size: 12px; letter-spacing: 0.4px; }
+        .subject { font-weight: 700; text-decoration: underline; margin: 16px 0; }
+        .terms-title { font-weight: 700; margin: 16px 0 8px; }
+        ol.terms { padding-left: 18px; margin: 0 0 16px; }
+        ol.terms li { margin-bottom: 12px; }
         .sign { margin-top: 28px; }
-        .sign-name { font-weight: 700; margin: 18px 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; }
-        .sign-title { font-size: 11px; letter-spacing: 0.3px; }
-        .rule { border: none; border-top: 2px solid #14532d; margin: 0 0 12px; }
+        .sign-name { font-weight: 700; margin: 22px 0 0; font-family: Arial, Helvetica, sans-serif; font-size: 12px; letter-spacing: 0.4px; }
+        .sign-title { font-size: 11px; letter-spacing: 0.5px; margin: 2px 0 0; font-family: Arial, Helvetica, sans-serif; }
+        .acceptance { margin-top: 36px; border-top: 1px solid #c5d0c8; padding-top: 16px; }
+        .acceptance h3 { margin: 0 0 10px; font-size: 13px; letter-spacing: 0.5px; }
+        .acceptance-line { margin: 10px 0; }
+        .rule { border: none; border-top: 2px solid #14532d; margin: 0 0 14px; }
     </style>
 </head>
 <body>
-<p class="brand" th:text="${companyName}">Sagar Cements Limited</p>
-<p class="sub">Offer of Appointment</p>
+<!-- Formal Offer Letter — wording aligned to SCL_Offer Letter_Revised (client). -->
+<p class="brand" th:text="${companyNameUpper}">SAGAR CEMENTS LIMITED</p>
 <hr class="rule"/>
-<p class="meta">Ref. No.: SCL/HR/OFR/____</p>
-<p class="meta">Date: <span th:text="${acceptBeforeDate}">Date</span></p>
+<p class="meta">Ref. No.: <span th:text="${refNo}">SCL/HR/OFR/____</span></p>
+<p class="meta">Date: <span th:text="${letterDate}">Date</span></p>
 <p class="conf">Strictly Private &amp; Confidential</p>
 
-<p>Dear <b th:text="${candidateName}">Candidate</b>,</p>
-<p class="subject">Sub: Offer of Appointment – <span th:text="${positionTitle}">Position</span></p>
-<p>
-    With reference to your application and the subsequent interview you had with us, we are pleased to offer you
-    an appointment as <b th:text="${positionTitle}">Position</b> at
-    <b th:text="${location}">Location</b>. The detailed terms and conditions, including the compensation structure,
-    will be provided in the Letter of Appointment at the time of joining.
+<p th:if="${candidateName}">
+    <b th:text="${candidateName}">Candidate</b><br/>
+    <span th:if="${candidateEmail}" th:text="${candidateEmail}">email</span><br th:if="${candidateEmail}"/>
+    <span th:if="${candidatePhone}" th:text="${candidatePhone}">phone</span>
 </p>
 
-<table class="details">
-    <tr><td class="label">Position</td><td th:text="${positionTitle}">Position</td></tr>
-    <tr><td class="label">Department</td><td th:text="${department}">Department</td></tr>
-    <tr><td class="label">Location</td><td th:text="${location}">Location</td></tr>
-    <tr><td class="label">Annual Compensation (CTC)</td><td>&#8377; <span th:text="${salary}">0</span></td></tr>
-    <tr><td class="label">Offer Valid Until</td><td th:text="${acceptBeforeDate}">date</td></tr>
-    <tr><td class="label">Proposed Joining Date</td><td th:text="${joiningDate}">date</td></tr>
-</table>
+<p>Dear <b th:text="${candidateSalutation}">Candidate</b>,</p>
 
-<ol>
-    <li><b>Medical Fitness:</b> This offer is contingent upon your being certified medically fit. You shall undergo a pre-employment medical examination at the Company's cost before the joining date.</li>
-    <li><b>Verification:</b> Appointment is subject to satisfactory verification of your credentials, past employment records and background antecedents.</li>
-    <li><b>Documents at Joining:</b> Please produce original certificates/testimonials, one set of photocopies, two recent passport-size photographs, and a relieving letter from your current employer.</li>
-    <li><b>Letter of Appointment:</b> Detailed terms including compensation will be provided in the Letter of Appointment collected from HR at joining; that letter will supersede this offer.</li>
-    <li><b>Acceptance and Validity:</b> Please confirm acceptance by the date above, failing which this offer shall be deemed to have lapsed.</li>
-    <li><b>Confidentiality:</b> The contents of this offer are confidential and shall not be disclosed to any third party.</li>
+<p class="subject">
+    Sub: Offer of Appointment – <span th:text="${positionTitle}">Position</span>
+</p>
+
+<p>
+    With reference to your application for employment and the subsequent interview you had with us,
+    we are pleased to offer you employment as <b th:text="${positionTitle}">Position</b>,
+    to be based at <b th:text="${location}">Location</b>,
+    on the compensation and terms mutually agreed
+    <th:block th:if="${salaryDisplay}">
+        (Annual CTC: &#8377; <span th:text="${salaryDisplay}">0</span>)
+    </th:block>
+    and as will be detailed in your Letter of Appointment.
+</p>
+
+<p class="terms-title">This offer is subject to the following terms and conditions:</p>
+<ol class="terms">
+    <li>
+        <b>Medical Fitness:</b> This offer is contingent upon your being certified medically fit for employment.
+        You shall undergo a pre-employment medical examination at a hospital or by a registered medical practitioner
+        nominated by the Company, at the Company's cost, on or before your date of joining. In the event you are found
+        medically unfit for the role, or if you fail to undergo the examination, the Company reserves the right to
+        withdraw or revoke this offer, or to cancel the appointment if already made, without any liability or
+        compensation whatsoever.
+    </li>
+    <li>
+        <b>Verification of Credentials and Antecedents:</b> This offer and your continued appointment are subject to
+        satisfactory verification of your educational and professional credentials, past employment records, and
+        background antecedents. Any material discrepancy, misrepresentation, or suppression of facts shall entitle
+        the Company to withdraw this offer or terminate your services forthwith, without notice or compensation.
+    </li>
+    <li>
+        <b>Documents at Joining:</b> On the date of joining, you shall produce all original certificates and
+        testimonials together with one set of photocopies for verification, along with two recent passport-size
+        photographs, and a relieving letter from your present employer, if applicable.
+    </li>
+    <li>
+        <b>Letter of Appointment:</b> Your detailed terms and conditions of employment, including compensation
+        structure, will be set out in the Letter of Appointment, to be collected from the HR Department at the time
+        of joining. The Letter of Appointment shall supersede this offer letter.
+    </li>
+    <li>
+        <b>Acceptance and Validity:</b> Please confirm your acceptance by the offer validity date of
+        <b th:text="${acceptBeforeDate}">date</b>
+        <th:block th:if="${joiningDateDisplay}">
+            (proposed joining date: <b th:text="${joiningDateDisplay}">date</b>)
+        </th:block>,
+        failing which this offer shall be deemed to have lapsed.
+    </li>
+    <li>
+        <b>Confidentiality:</b> The contents of this offer are confidential and shall not be disclosed to any third
+        party. This letter supersedes all prior discussions, communications, and understandings, whether oral or
+        written, in respect of your appointment.
+    </li>
 </ol>
 
-<p>We look forward to welcoming you and wish you a successful career with our organization.</p>
+<p>We look forward to welcoming you and wish you a successful and fruitful career with our organization.</p>
 
 <div class="sign">
-    <p>Thanking you,<br/>Yours faithfully,<br/>For <span th:text="${companyName}">Sagar Cements Limited</span></p>
+    <p>Thanking you,<br/>Yours faithfully,<br/>For <span th:text="${companyNameUpper}">SAGAR CEMENTS LIMITED</span></p>
     <p class="sign-name">K. GANESH</p>
     <p class="sign-title">GROUP PRESIDENT</p>
+</div>
+
+<div class="acceptance">
+    <h3>ACCEPTANCE</h3>
+    <p>
+        I have read and understood the above terms and conditions and accept the offer of appointment.
+        I shall report for duty on: ______________________
+    </p>
+    <p class="acceptance-line">Date: _____________________________________________</p>
+    <p class="acceptance-line">
+        Place: _______________
+        <span th:if="${candidateName}" th:text="'(' + ${candidateName} + ')'">(Candidate)</span>
+    </p>
 </div>
 </body>
 </html>

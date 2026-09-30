@@ -21,6 +21,7 @@ public final class IstTime {
     public static final ZoneId ZONE = ZoneId.of("Asia/Kolkata");
 
     private static final DateTimeFormatter DATE_FMT     = DateTimeFormatter.ofPattern("dd-MMM-yyyy");
+    private static final DateTimeFormatter DATE_LONG_FMT = DateTimeFormatter.ofPattern("d MMMM yyyy");
     private static final DateTimeFormatter TIME_FMT     = DateTimeFormatter.ofPattern("hh:mm a");
     private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("dd-MMM-yyyy, hh:mm a");
 
@@ -44,6 +45,11 @@ public final class IstTime {
     /** Alias used by email builders. */
     public static String formatDate(LocalDate date) {
         return fmtDate(date);
+    }
+
+    /** "27 November 2025" — letter-style long date; returns "-" for null. */
+    public static String fmtDateLong(LocalDate date) {
+        return date != null ? date.format(DATE_LONG_FMT) : "-";
     }
 
     /** "10:30 AM" — returns "-" for null. */

@@ -171,5 +171,29 @@ public class SchemaConstraintFixer implements CommandLineRunner {
         } catch (Exception e) {
             log.warn("Could not ensure panel_member_scores competency columns: {}", e.getMessage());
         }
+
+        // Standard = concise modern letter (template2); Formal = full client SCL offer letter (template1).
+        // Ignore any Appointment Letter option in the dropdown.
+        try {
+            jdbcTemplate.update("""
+                    UPDATE common.offer_templates
+                    SET file_name = 'template2.html', name = 'Standard Offer Letter'
+                    WHERE LOWER(COALESCE(name, '')) LIKE '%standard%'
+                    """);
+            jdbcTemplate.update("""
+                    UPDATE common.offer_templates
+                    SET file_name = 'template1.html', name = 'Formal Offer Letter'
+                    WHERE LOWER(COALESCE(name, '')) LIKE '%formal%'
+                    """);
+            int deactivated = jdbcTemplate.update("""
+                    UPDATE common.offer_templates
+                    SET is_active = false
+                    WHERE COALESCE(is_active, true) = true
+                      AND LOWER(COALESCE(name, '')) LIKE '%appointment%'
+                    """);
+            log.info("Aligned offer templates: Standard→template2, Formal→template1; deactivated appointment rows={}", deactivated);
+        } catch (Exception e) {
+            log.warn("Could not align offer template mapping: {}", e.getMessage());
+        }
     }
 }

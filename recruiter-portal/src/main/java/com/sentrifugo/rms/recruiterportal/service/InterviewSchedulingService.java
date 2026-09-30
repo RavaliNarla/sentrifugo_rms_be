@@ -57,6 +57,7 @@ public class InterviewSchedulingService {
     private final JobPositionRepository jobPositionRepository;
     private final PositionTitleRepository positionTitleRepository;
     private final LocationRepository locationRepository;
+    private final JobRequisitionRepository jobRequisitionRepository;
     private final UserRepository userRepository;
     private final MailService mailService;
     private final NotificationService notificationService;
@@ -537,10 +538,17 @@ public class InterviewSchedulingService {
             }
             String positionTitle = resolvePositionTitle(candidate);
             String location = resolveLocationName(candidate);
+            String reqCode = resolveRequisitionCode(candidate);
+            String summary = "Interview: " + candidate.getName()
+                    + (reqCode != null ? " | " + reqCode : "")
+                    + (positionTitle != null ? " — " + positionTitle : "");
             events.add(new IcsCalendarBuilder.Event(
                     schedule.getId() + "@interview.sentrifugo-rms",
-                    "Interview: " + candidate.getName() + (positionTitle != null ? " — " + positionTitle : ""),
+                    summary,
                     "Candidate: " + candidate.getName()
+                            + (reqCode != null ? "\\nRequisition: " + reqCode : "")
+                            + (positionTitle != null ? "\\nPosition: " + positionTitle : "")
+                            + (location != null ? "\\nLocation: " + location : "")
                             + "\\nRound: " + (schedule.getRound() != null ? schedule.getRound() : 1)
                             + "\\nTime: " + schedule.getStartTime() + " – " + schedule.getEndTime()
                             + (candidate.getEmail() != null ? "\\nEmail: " + candidate.getEmail() : "")
@@ -972,6 +980,15 @@ public class InterviewSchedulingService {
                 .orElse(null);
     }
 
+    private String resolveRequisitionCode(CandidateEntity candidate) {
+        if (candidate.getRequisitionId() == null) {
+            return null;
+        }
+        return jobRequisitionRepository.findById(candidate.getRequisitionId())
+                .map(r -> r.getRequisitionCode() != null ? r.getRequisitionCode() : r.getTitle())
+                .orElse(null);
+    }
+
     private PendingMail buildCandidateInviteEmail(CandidateEntity candidate, Slot slot, int round, String roundName,
                                                   InterviewPanelEntity panel, String location,
                                                   String positionTitle, UUID token) {
@@ -1020,6 +1037,8 @@ public class InterviewSchedulingService {
                 return;
             }
             String positionTitle = resolvePositionTitle(candidate);
+            String location = resolveLocationName(candidate);
+            String reqCode = resolveRequisitionCode(candidate);
             int round = schedule.getRound() != null ? schedule.getRound() : 1;
             Set<String> sent = new HashSet<>();
             for (UUID ownerId : ownerIds) {
@@ -1031,7 +1050,8 @@ public class InterviewSchedulingService {
                     continue;
                 }
                 RmsEmailTemplates.BuiltEmail email = emailTemplates.recruiterInviteResponse(
-                        recruiter.getName(), candidate.getName(), positionTitle, round, schedule.getRoundName(), accepted);
+                        recruiter.getName(), candidate.getName(), positionTitle, reqCode, location,
+                        round, schedule.getRoundName(), accepted);
                 emailTemplates.sendAsync(recruiter.getEmail(), email);
             }
         } catch (Exception e) {
@@ -1045,7 +1065,16 @@ public class InterviewSchedulingService {
             return null;
         }
         String day = IstTime.fmtDate(interviewDate);
-        RmsEmailTemplates.BuiltEmail email = emailTemplates.panelDaySchedule(user.getName(), day, dayCount);
+        List<String> lines = dayEvents.stream()
+                .map(e -> {
+                    String time = (e.start() != null ? IstTime.fmtTime(e.start()) : "")
+                            + (e.end() != null ? " – " + IstTime.fmtTime(e.end()) : "");
+                    String base = e.summary() != null ? e.summary() : "Interview";
+                    String loc = e.location() != null && !e.location().isBlank() ? " @ " + e.location() : "";
+                    return (time.isBlank() ? base : time + " — " + base) + loc;
+                })
+                .toList();
+        RmsEmailTemplates.BuiltEmail email = emailTemplates.panelDaySchedule(user.getName(), day, dayCount, lines);
         List<IcsCalendarBuilder.NamedIcs> files = IcsCalendarBuilder.multiEventIcsFiles(
                 "interviews-" + interviewDate, dayEvents);
         List<MailService.Attachment> attachments = files.stream()

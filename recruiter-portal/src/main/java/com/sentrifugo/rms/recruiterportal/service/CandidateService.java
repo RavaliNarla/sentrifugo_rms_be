@@ -10,6 +10,7 @@ import com.sentrifugo.rms.db.repository.CandidateOfferRepository;
 import com.sentrifugo.rms.db.repository.CandidateRepository;
 import com.sentrifugo.rms.db.repository.InterviewScheduleRepository;
 import com.sentrifugo.rms.db.repository.JobPositionRepository;
+import com.sentrifugo.rms.db.repository.LocationRepository;
 import com.sentrifugo.rms.db.repository.PositionTitleRepository;
 import com.sentrifugo.rms.recruiterportal.dto.CandidateDTO;
 import com.sentrifugo.rms.recruiterportal.dto.ShortlistDecisionRequest;
@@ -51,6 +52,7 @@ public class CandidateService {
     private final CandidateRepository candidateRepository;
     private final JobPositionRepository jobPositionRepository;
     private final PositionTitleRepository positionTitleRepository;
+    private final LocationRepository locationRepository;
     private final InterviewScheduleRepository interviewScheduleRepository;
     private final CandidateOfferRepository candidateOfferRepository;
     private final FileStorageService fileStorageService;
@@ -284,14 +286,18 @@ public class CandidateService {
         }
         String to = entity.getEmail();
         String name = entity.getName() != null ? entity.getName() : "Candidate";
-        String positionTitle = jobPositionRepository.findById(entity.getPositionId())
-                .map(p -> positionTitleRepository.findById(p.getPositionTitleId()).map(t -> t.getName()).orElse(null))
-                .orElse(null);
+        JobPositionEntity position = jobPositionRepository.findById(entity.getPositionId()).orElse(null);
+        String positionTitle = position != null
+                ? positionTitleRepository.findById(position.getPositionTitleId()).map(t -> t.getName()).orElse(null)
+                : null;
+        String locationName = position != null
+                ? locationRepository.findById(position.getLocationId()).map(l -> l.getName()).orElse(null)
+                : null;
 
         RmsEmailTemplates.BuiltEmail email = switch (decision) {
-            case SHORTLIST -> emailTemplates.shortlisted(name, positionTitle);
-            case HOLD -> emailTemplates.onHold(name, positionTitle);
-            case REJECT -> emailTemplates.shortlistRejected(name, positionTitle);
+            case SHORTLIST -> emailTemplates.shortlisted(name, positionTitle, locationName);
+            case HOLD -> emailTemplates.onHold(name, positionTitle, locationName);
+            case REJECT -> emailTemplates.shortlistRejected(name, positionTitle, locationName);
         };
         boolean attachPdf = decision == ShortlistDecisionRequest.Decision.REJECT;
 

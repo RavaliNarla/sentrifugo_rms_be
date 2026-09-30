@@ -190,7 +190,9 @@ public class OfferService {
             recordHistory(offer.getId(), currentUserId, actorName, OfferStatus.L1_PENDING.name(), null);
         }
         candidateOfferRepository.saveAll(offers);
-        notifyApproversBothLevels("Offer letter(s) pending approval");
+        for (CandidateOfferEntity offer : offers) {
+            notifyApproversBothLevels(resolveOfferHiringDetails(offer));
+        }
 
         for (CandidateOfferEntity offer : offers) {
             CandidateEntity candidate = candidateRepository.findById(offer.getCandidateId()).orElse(null);
@@ -245,19 +247,37 @@ public class OfferService {
 
         for (CandidateOfferEntity o : offers) {
             List<UUID> owners = resolveOwnerRecipients(o);
-            String label = "Offer letter";
+            RmsEmailTemplates.HiringDetails details = resolveOfferHiringDetails(o);
             if (approver.getApproverRole() == ApproverRole.L1) {
                 if (o.getStatus() == OfferStatus.L2_PENDING) {
-                    notifyUsersAboutDecision(ApproverRole.L2, owners, label, "L1", true, "Awaiting your L2 approval.");
+                    notifyUsersAboutDecision(ApproverRole.L2, owners, "L1", true, "Awaiting your L2 approval.", details);
                 } else if (o.getStatus() == OfferStatus.L1_REJECTED) {
-                    notifyUsersAboutDecision(null, owners, label, "L1", false, "The offer was rejected at L1.");
+                    notifyUsersAboutDecision(null, owners, "L1", false, "The offer was rejected at L1.", details);
                 }
             } else if (o.getStatus() == OfferStatus.L2_REJECTED) {
-                notifyUsersAboutDecision(null, owners, label, "L2", false, "The offer was rejected at L2.");
+                notifyUsersAboutDecision(null, owners, "L2", false, "The offer was rejected at L2.", details);
             } else if (o.getStatus() == OfferStatus.SENT) {
-                notifyUsersAboutDecision(null, owners, label, "L2", true, "The offer was approved and emailed to the candidate.");
+                notifyUsersAboutDecision(null, owners, "L2", true, "The offer was approved and emailed to the candidate.", details);
             }
         }
+    }
+
+    private RmsEmailTemplates.HiringDetails resolveOfferHiringDetails(CandidateOfferEntity offer) {
+        CandidateEntity candidate = candidateRepository.findById(offer.getCandidateId()).orElse(null);
+        if (candidate == null) {
+            return RmsEmailTemplates.HiringDetails.of(null, null, null, null);
+        }
+        JobPositionEntity position = jobPositionRepository.findById(candidate.getPositionId()).orElse(null);
+        String designation = position != null
+                ? positionTitleRepository.findById(position.getPositionTitleId()).map(PositionTitleEntity::getName).orElse(null)
+                : null;
+        String location = position != null
+                ? locationRepository.findById(position.getLocationId()).map(LocationEntity::getName).orElse(null)
+                : null;
+        String reqCode = jobRequisitionRepository.findById(candidate.getRequisitionId())
+                .map(r -> r.getRequisitionCode() != null ? r.getRequisitionCode() : r.getTitle())
+                .orElse(null);
+        return RmsEmailTemplates.HiringDetails.of(candidate.getName(), reqCode, designation, location);
     }
 
     /** Creator (offer generator) and/or submitter (latest L1_PENDING actor). Both when they differ. */
@@ -414,17 +434,21 @@ public class OfferService {
                     : "-";
             RmsEmailTemplates.BuiltEmail toCandidate = accept
                     ? emailTemplates.offerAccepted(candidate.getName(), designation, location, offer.getJoiningDate())
-                    : emailTemplates.offerDeclined(candidate.getName(), designation);
+                    : emailTemplates.offerDeclined(candidate.getName(), designation, location);
             emailTemplates.sendAsync(candidate.getEmail(), toCandidate, true,
                     accept ? "offer-acceptance.pdf" : "offer-acknowledgement.pdf");
 
+            String reqCode = jobRequisitionRepository.findById(candidate.getRequisitionId())
+                    .map(r -> r.getRequisitionCode() != null ? r.getRequisitionCode() : r.getTitle())
+                    .orElse(null);
             Set<String> sent = new HashSet<>();
             for (UUID ownerId : resolveOwnerRecipients(offer)) {
                 userRepository.findById(ownerId).ifPresent(u -> {
                     if (u.getEmail() != null && !u.getEmail().isBlank()
                             && sent.add(u.getEmail().trim().toLowerCase())) {
                         emailTemplates.sendAsync(u.getEmail(),
-                                emailTemplates.recruiterOfferResponse(u.getName(), candidate.getName(), designation, accept));
+                                emailTemplates.recruiterOfferResponse(
+                                        u.getName(), candidate.getName(), designation, reqCode, location, accept));
                     }
                 });
             }
@@ -438,16 +462,26 @@ public class OfferService {
                 .orElseThrow(() -> new ResourceNotFoundException("Position not found"));
 
         Context context = new Context();
-        context.setVariable("candidateName", candidate.getName());
+        String name = candidate.getName();
+        context.setVariable("candidateName", name);
+        context.setVariable("candidateSalutation", name);
         context.setVariable("candidateEmail", candidate.getEmail());
         context.setVariable("candidatePhone", candidate.getPhone());
         context.setVariable("positionTitle", positionTitleRepository.findById(position.getPositionTitleId()).map(e -> e.getName()).orElse("-"));
         context.setVariable("department", departmentRepository.findById(position.getDepartmentId()).map(e -> e.getName()).orElse("-"));
         context.setVariable("location", locationRepository.findById(position.getLocationId()).map(e -> e.getName()).orElse("-"));
-        context.setVariable("salary", candidate.getAgreedCtc() != null ? candidate.getAgreedCtc() : candidate.getSalary());
-        context.setVariable("acceptBeforeDate", acceptBeforeDate != null ? acceptBeforeDate.toString() : "-");
-        context.setVariable("joiningDate", joiningDate != null ? joiningDate.toString() : "-");
+        Object salaryVal = candidate.getAgreedCtc() != null ? candidate.getAgreedCtc() : candidate.getSalary();
+        String salaryStr = salaryVal != null ? salaryVal.toString() : "-";
+        context.setVariable("salary", salaryStr);
+        context.setVariable("salaryDisplay", salaryVal != null ? salaryStr : null);
+        context.setVariable("acceptBeforeDate", acceptBeforeDate != null ? IstTime.fmtDateLong(acceptBeforeDate) : "-");
+        String joiningDisplay = joiningDate != null ? IstTime.fmtDateLong(joiningDate) : null;
+        context.setVariable("joiningDate", joiningDisplay != null ? joiningDisplay : "-");
+        context.setVariable("joiningDateDisplay", joiningDisplay);
+        context.setVariable("letterDate", IstTime.fmtDateLong(IstTime.today()));
+        context.setVariable("refNo", "SCL/HR/OFR/" + IstTime.today().getYear() + "/____");
         context.setVariable("companyName", companyName);
+        context.setVariable("companyNameUpper", companyName != null ? companyName.toUpperCase() : "SAGAR CEMENTS LIMITED");
 
         String templateName = template.getFileName().replace(".html", "");
         return templateEngine.process("offer/" + templateName, context);
@@ -456,15 +490,22 @@ public class OfferService {
     private String renderOfferHtmlWithPlaceholders(OfferTemplateEntity template, LocalDate acceptBeforeDate, LocalDate joiningDate) {
         Context context = new Context();
         context.setVariable("candidateName", "<Candidate_Name>");
+        context.setVariable("candidateSalutation", "<Candidate_Name>");
         context.setVariable("candidateEmail", "<Candidate_Email>");
         context.setVariable("candidatePhone", "<Candidate_Phone>");
         context.setVariable("positionTitle", "<Position_Title>");
         context.setVariable("department", "<Department>");
         context.setVariable("location", "<Location>");
         context.setVariable("salary", "<Agreed_CTC>");
-        context.setVariable("acceptBeforeDate", acceptBeforeDate != null ? acceptBeforeDate.toString() : "<Accept_Before_Date>");
-        context.setVariable("joiningDate", joiningDate != null ? joiningDate.toString() : "<Joining_Date>");
+        context.setVariable("salaryDisplay", "<Agreed_CTC>");
+        context.setVariable("acceptBeforeDate", acceptBeforeDate != null ? IstTime.fmtDateLong(acceptBeforeDate) : "<Accept_Before_Date>");
+        String joiningDisplay = joiningDate != null ? IstTime.fmtDateLong(joiningDate) : null;
+        context.setVariable("joiningDate", joiningDisplay != null ? joiningDisplay : "<Joining_Date>");
+        context.setVariable("joiningDateDisplay", joiningDisplay != null ? joiningDisplay : "<Joining_Date>");
+        context.setVariable("letterDate", IstTime.fmtDateLong(IstTime.today()));
+        context.setVariable("refNo", "SCL/HR/OFR/" + IstTime.today().getYear() + "/____");
         context.setVariable("companyName", companyName);
+        context.setVariable("companyNameUpper", companyName != null ? companyName.toUpperCase() : "SAGAR CEMENTS LIMITED");
 
         String templateName = template.getFileName().replace(".html", "");
         return templateEngine.process("offer/" + templateName, context);
@@ -493,7 +534,7 @@ public class OfferService {
         }
     }
 
-    private void notifyApprover(ApproverRole role, String itemLabel, String level) {
+    private void notifyApprover(ApproverRole role, RmsEmailTemplates.HiringDetails details, String level) {
         try {
             List<RequisitionApproverEntity> approvers = requisitionApproverRepository.findByApproverRole(role);
             for (RequisitionApproverEntity approver : approvers) {
@@ -501,7 +542,7 @@ public class OfferService {
                 user.ifPresent(u -> {
                     if (u.getEmail() != null) {
                         emailTemplates.sendAsync(u.getEmail(),
-                                emailTemplates.approverSubmission(u.getName(), "Offer letter", itemLabel, level));
+                                emailTemplates.approverSubmission(u.getName(), "Offer letter", level, details));
                     }
                 });
             }
@@ -510,13 +551,14 @@ public class OfferService {
         }
     }
 
-    private void notifyApproversBothLevels(String itemLabel) {
-        notifyApprover(ApproverRole.L1, itemLabel, "L1");
-        notifyApprover(ApproverRole.L2, itemLabel, "L2");
+    private void notifyApproversBothLevels(RmsEmailTemplates.HiringDetails details) {
+        notifyApprover(ApproverRole.L1, details, "L1");
+        notifyApprover(ApproverRole.L2, details, "L2");
     }
 
-    private void notifyUsersAboutDecision(ApproverRole nextRoleOrNull, Collection<UUID> ownerIds, String itemLabel,
-                                          String decidedByLevel, boolean approved, String nextHint) {
+    private void notifyUsersAboutDecision(ApproverRole nextRoleOrNull, Collection<UUID> ownerIds,
+                                          String decidedByLevel, boolean approved, String nextHint,
+                                          RmsEmailTemplates.HiringDetails details) {
         try {
             Set<String> sentEmails = new HashSet<>();
             if (nextRoleOrNull != null) {
@@ -524,7 +566,7 @@ public class OfferService {
                     userRepository.findById(approver.getApproverId()).ifPresent(u -> {
                         if (u.getEmail() != null && sentEmails.add(u.getEmail().trim().toLowerCase())) {
                             emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
-                                    u.getName(), "Offer letter", itemLabel, decidedByLevel, approved, nextHint));
+                                    u.getName(), "Offer letter", decidedByLevel, approved, nextHint, details));
                         }
                     });
                 }
@@ -537,7 +579,7 @@ public class OfferService {
                     userRepository.findById(ownerId).ifPresent(u -> {
                         if (u.getEmail() != null && sentEmails.add(u.getEmail().trim().toLowerCase())) {
                             emailTemplates.sendAsync(u.getEmail(), emailTemplates.approvalDecisionNotice(
-                                    u.getName(), "Offer letter", itemLabel, decidedByLevel, approved, nextHint));
+                                    u.getName(), "Offer letter", decidedByLevel, approved, nextHint, details));
                         }
                     });
                 }

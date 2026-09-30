@@ -55,6 +55,8 @@ public class InterviewPoolService {
     private final InterviewPanelRepository interviewPanelRepository;
     private final JobPositionRepository jobPositionRepository;
     private final JobRequisitionRepository jobRequisitionRepository;
+    private final PositionTitleRepository positionTitleRepository;
+    private final LocationRepository locationRepository;
     private final UserRepository userRepository;
     private final InterviewRoundMetaRepository interviewRoundMetaRepository;
     private final SecurityUtils securityUtils;
@@ -247,8 +249,15 @@ public class InterviewPoolService {
             candidateRepository.save(candidate);
             try {
                 if (candidate.getEmail() != null && !candidate.getEmail().isBlank()) {
+                    JobPositionEntity position = jobPositionRepository.findById(candidate.getPositionId()).orElse(null);
+                    String positionTitle = position != null
+                            ? positionTitleRepository.findById(position.getPositionTitleId()).map(PositionTitleEntity::getName).orElse(null)
+                            : null;
+                    String locationName = position != null
+                            ? locationRepository.findById(position.getLocationId()).map(LocationEntity::getName).orElse(null)
+                            : null;
                     RmsEmailTemplates.BuiltEmail email = emailTemplates.interviewOutcome(
-                            candidate.getName(), null, round, schedule.getRoundName(),
+                            candidate.getName(), positionTitle, locationName, round, schedule.getRoundName(),
                             qualified, schedule.getInterviewDate());
                     emailTemplates.sendAsync(candidate.getEmail(), email, true, "interview-result.pdf");
                 }

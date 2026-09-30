@@ -22,6 +22,6 @@ public class AppConstants {
     public static final String ROLE_RECRUITER = "RECRUITER";
     public static final String ROLE_COMMITTEE_MEMBER = "COMMITTEE_MEMBER";
 
-    /** Default password applied when backfilling existing users (change via Forgot Password). */
-    public static final String DEFAULT_USER_PASSWORD = "Sagarsoft@12345";
+    /** Default password applied when backfilling / resetting users (change via Forgot Password). */
+    public static final String DEFAULT_USER_PASSWORD = "Sagarsoft@123";
 }
