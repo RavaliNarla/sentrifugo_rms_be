@@ -77,7 +77,7 @@ public class InterviewPoolController {
     @Operation(summary = "Submit scores for multiple candidates in one batch")
     @PostMapping("/score-batch")
     public ResponseEntity<ApiResponse<Void>> submitScoreBatch(@Valid @RequestBody List<ScoreSubmitRequest> requests) {
-        requests.forEach(interviewPoolService::submitScore);
+        interviewPoolService.submitScores(requests);
         return ResponseEntity.ok(ApiResponse.ok("Scores submitted successfully"));
     }
 }

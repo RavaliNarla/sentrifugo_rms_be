@@ -4,6 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sentrifugo.rms.common.exception.CommonException;
 import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
+import com.sentrifugo.rms.common.util.IstTime;
 import com.sentrifugo.rms.common.util.SecurityUtils;
 import com.sentrifugo.rms.db.entity.*;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
@@ -153,6 +154,30 @@ public class InterviewPoolService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Interviewer "Submit Scores": all rows are checked for future interview dates first, then
+     * saved in one transaction - so a locked row means nothing is saved (no partial batch).
+     */
+    @Transactional
+    public void submitScores(List<ScoreSubmitRequest> requests) {
+        for (ScoreSubmitRequest request : requests) {
+            CandidateEntity candidate = candidateRepository.findById(request.getCandidateId())
+                    .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
+            interviewScheduleRepository.findByCandidateId(candidate.getId())
+                    .ifPresent(schedule -> assertInterviewDateReached(candidate, schedule));
+        }
+        requests.forEach(this::submitScore);
+    }
+
+    /** Scores open on the interview date (IST); future-dated interviews can't be scored yet. */
+    private void assertInterviewDateReached(CandidateEntity candidate, InterviewScheduleEntity schedule) {
+        LocalDate interviewDate = schedule.getInterviewDate();
+        if (interviewDate != null && interviewDate.isAfter(IstTime.today())) {
+            throw new CommonException("Scores for " + candidate.getName() + " can be entered only on or after the interview date ("
+                    + IstTime.fmtDate(interviewDate) + ").");
+        }
+    }
+
     @Transactional
     public void submitScore(ScoreSubmitRequest request) {
         UUID panelMemberId = securityUtils.getCurrentUserId();
@@ -161,6 +186,7 @@ public class InterviewPoolService {
 
         InterviewScheduleEntity schedule = interviewScheduleRepository.findByCandidateId(candidate.getId())
                 .orElseThrow(() -> new CommonException("Candidate has not been scheduled for an interview."));
+        assertInterviewDateReached(candidate, schedule);
 
         int round = schedule.getRound() != null ? schedule.getRound() : 1;
 

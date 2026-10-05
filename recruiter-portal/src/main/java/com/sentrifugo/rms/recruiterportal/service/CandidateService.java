@@ -270,17 +270,20 @@ public class CandidateService {
             case REJECT -> CandidateStatus.REJECTED;
             case HOLD -> CandidateStatus.ON_HOLD;
         };
-        // Re-applying the current decision would be a no-op that re-sends the status email.
+        // Re-applying the current decision would be a no-op (and would re-send the rejection email).
         if (entity.getStatus() == next) {
             throw new CommonException("Candidate is already " + next.name().replace('_', ' ') + ".");
         }
         entity.setStatus(next);
         candidateRepository.save(entity);
 
-        queueShortlistStatusEmailAfterCommit(entity, decision);
+        // Only a rejection is emailed to the candidate; Shortlisted / On Hold are internal statuses.
+        if (decision == ShortlistDecisionRequest.Decision.REJECT) {
+            queueRejectionEmailAfterCommit(entity);
+        }
     }
 
-    private void queueShortlistStatusEmailAfterCommit(CandidateEntity entity, ShortlistDecisionRequest.Decision decision) {
+    private void queueRejectionEmailAfterCommit(CandidateEntity entity) {
         if (entity.getEmail() == null || entity.getEmail().isBlank()) {
             return;
         }
@@ -294,18 +297,13 @@ public class CandidateService {
                 ? locationRepository.findById(position.getLocationId()).map(l -> l.getName()).orElse(null)
                 : null;
 
-        RmsEmailTemplates.BuiltEmail email = switch (decision) {
-            case SHORTLIST -> emailTemplates.shortlisted(name, positionTitle, locationName);
-            case HOLD -> emailTemplates.onHold(name, positionTitle, locationName);
-            case REJECT -> emailTemplates.shortlistRejected(name, positionTitle, locationName);
-        };
-        boolean attachPdf = decision == ShortlistDecisionRequest.Decision.REJECT;
+        RmsEmailTemplates.BuiltEmail email = emailTemplates.shortlistRejected(name, positionTitle, locationName);
 
         Runnable send = () -> {
             try {
-                emailTemplates.sendAsync(to, email, attachPdf, "application-update.pdf");
+                emailTemplates.sendAsync(to, email, true, "application-update.pdf");
             } catch (Exception e) {
-                log.warn("Failed to queue shortlist status email ({}) to {}: {}", decision, to, e.getMessage());
+                log.warn("Failed to queue rejection email to {}: {}", to, e.getMessage());
             }
         };
         if (TransactionSynchronizationManager.isSynchronizationActive()) {
