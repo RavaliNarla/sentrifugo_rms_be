@@ -28,10 +28,17 @@ public class SchemaConstraintFixer implements CommandLineRunner {
             if (updated > 0) {
                 log.info("Backfilled {} candidate(s) from NOT_SHORTLISTED → REJECTED", updated);
             }
+            // Bulk-imported candidates without a resume: DRAFT was renamed to RESUME_PENDING.
+            int resumePending = jdbcTemplate.update(
+                    "UPDATE recruitment.candidates SET status = 'RESUME_PENDING' WHERE status = 'DRAFT'");
+            if (resumePending > 0) {
+                log.info("Backfilled {} candidate(s) from DRAFT → RESUME_PENDING", resumePending);
+            }
+            // 'DRAFT' stays allowed only while teammates' portals on the shared DB still run pre-rename code.
             jdbcTemplate.execute("""
                     ALTER TABLE recruitment.candidates ADD CONSTRAINT candidates_status_check CHECK (
                       status::text = ANY (ARRAY[
-                        'DRAFT','ADDED','SHORTLISTED','REJECTED','ON_HOLD','INVITE_SENT','SCHEDULED','DECLINED',
+                        'RESUME_PENDING','DRAFT','ADDED','SHORTLISTED','REJECTED','ON_HOLD','INVITE_SENT','SCHEDULED','DECLINED',
                         'QUALIFIED','DISQUALIFIED','COMPENSATION_PENDING','COMPENSATION_SUBMITTED','MOVED_TO_OFFER'
                       ]::text[])
                     )

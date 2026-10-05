@@ -245,13 +245,18 @@ public class RmsEmailTemplates {
 
     public BuiltEmail recruiterInviteResponse(String recruiterName, String candidateName, String positionName,
                                               String requisitionCode, String locationName,
-                                              int round, String roundName, boolean accepted) {
+                                              int round, String roundName, LocalDate interviewDate,
+                                              LocalTime start, LocalTime end, boolean accepted) {
         String verb = accepted ? "accepted" : "declined";
+        String when = interviewDate == null ? ""
+                : " scheduled on " + bold(esc(IstTime.formatDate(interviewDate)))
+                + (start != null && end != null
+                        ? ", " + bold(esc(IstTime.formatTime(start) + " – " + IstTime.formatTime(end))) : "");
         String subject = "Candidate " + verb + " interview invite – " + nz(candidateName);
         String body = p("Hi " + esc(nz(recruiterName)) + ",")
                 + p(bold(esc(candidateName)) + " has " + bold(verb) + " the interview invitation"
                 + " (Round " + round
-                + (roundName != null && !roundName.isBlank() ? " – " + esc(roundName) : "") + ").")
+                + (roundName != null && !roundName.isBlank() ? " – " + esc(roundName) : "") + ")" + when + ".")
                 + hiringTeamDetails(HiringDetails.of(candidateName, requisitionCode, positionName, locationName))
                 + p("Please log in to Sagar Recruitment Hub to review the updated status.")
                 + signOff();

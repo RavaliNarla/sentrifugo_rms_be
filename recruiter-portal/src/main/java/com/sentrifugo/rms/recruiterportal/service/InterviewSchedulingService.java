@@ -550,7 +550,7 @@ public class InterviewSchedulingService {
                             + (positionTitle != null ? "\\nPosition: " + positionTitle : "")
                             + (location != null ? "\\nLocation: " + location : "")
                             + "\\nRound: " + (schedule.getRound() != null ? schedule.getRound() : 1)
-                            + "\\nTime: " + schedule.getStartTime() + " – " + schedule.getEndTime()
+                            + "\\nTime: " + IstTime.fmtTime(schedule.getStartTime()) + " – " + IstTime.fmtTime(schedule.getEndTime())
                             + (candidate.getEmail() != null ? "\\nEmail: " + candidate.getEmail() : "")
                             + "\\nStatus: " + candidate.getStatus().name(),
                     location,
@@ -726,7 +726,8 @@ public class InterviewSchedulingService {
                         .map(uid -> userNames.getOrDefault(uid, "Panel member"))
                         .collect(Collectors.joining(", "));
                 throw new CommonException("Scheduling conflict: " + names + " already has an interview on "
-                        + date + " from " + existingSchedule.getStartTime() + " to " + existingSchedule.getEndTime()
+                        + IstTime.fmtDate(date) + " from " + IstTime.fmtTime(existingSchedule.getStartTime())
+                        + " to " + IstTime.fmtTime(existingSchedule.getEndTime())
                         + ". Pick another panel, day, or time window.");
             }
         }
@@ -757,9 +758,9 @@ public class InterviewSchedulingService {
             int s = toMinutes(b.getStartTime());
             int e = toMinutes(b.getEndTime());
             if (s < winStart || e > winEnd) {
-                throw new CommonException("Break " + b.getStartTime() + "–" + b.getEndTime()
+                throw new CommonException("Break " + IstTime.fmtTime(b.getStartTime()) + " – " + IstTime.fmtTime(b.getEndTime())
                         + " must fall inside the interview window "
-                        + windowStart + "–" + windowEnd + ".");
+                        + IstTime.fmtTime(windowStart) + " – " + IstTime.fmtTime(windowEnd) + ".");
             }
             for (TimeRangeMins existing : breaks) {
                 if (s < existing.end() && existing.start() < e) {
@@ -813,14 +814,14 @@ public class InterviewSchedulingService {
             int s = toMinutes(cs.getStartTime());
             int e = toMinutes(cs.getEndTime());
             if (s < winStart || e > winEnd) {
-                throw new CommonException("Slot for '" + candidate.getName() + "' (" + cs.getStartTime()
-                        + "–" + cs.getEndTime() + ") is outside the interview window ("
-                        + request.getStartTime() + "–" + request.getEndTime() + ").");
+                throw new CommonException("Slot for '" + candidate.getName() + "' (" + IstTime.fmtTime(cs.getStartTime())
+                        + " – " + IstTime.fmtTime(cs.getEndTime()) + ") is outside the interview window ("
+                        + IstTime.fmtTime(request.getStartTime()) + " – " + IstTime.fmtTime(request.getEndTime()) + ").");
             }
             for (TimeRangeMins br : breaks) {
                 if (s < br.end() && br.start() < e) {
                     throw new CommonException("Slot for '" + candidate.getName() + "' overlaps a break ("
-                            + fromMinutes(br.start()) + "–" + fromMinutes(br.end()) + ").");
+                            + IstTime.fmtTime(fromMinutes(br.start())) + " – " + IstTime.fmtTime(fromMinutes(br.end())) + ").");
                 }
             }
             int slotDuration = e - s;
@@ -842,8 +843,9 @@ public class InterviewSchedulingService {
                     continue;
                 }
                 if (timesOverlap(a.start(), a.end(), b.start(), b.end())) {
-                    throw new CommonException("Interview slots overlap on " + a.date() + " ("
-                            + a.start() + "–" + a.end() + " and " + b.start() + "–" + b.end()
+                    throw new CommonException("Interview slots overlap on " + IstTime.fmtDate(a.date()) + " ("
+                            + IstTime.fmtTime(a.start()) + " – " + IstTime.fmtTime(a.end()) + " and "
+                            + IstTime.fmtTime(b.start()) + " – " + IstTime.fmtTime(b.end())
                             + "). Adjust candidate times so they do not overlap.");
                 }
             }
@@ -1051,7 +1053,8 @@ public class InterviewSchedulingService {
                 }
                 RmsEmailTemplates.BuiltEmail email = emailTemplates.recruiterInviteResponse(
                         recruiter.getName(), candidate.getName(), positionTitle, reqCode, location,
-                        round, schedule.getRoundName(), accepted);
+                        round, schedule.getRoundName(), schedule.getInterviewDate(),
+                        schedule.getStartTime(), schedule.getEndTime(), accepted);
                 emailTemplates.sendAsync(recruiter.getEmail(), email);
             }
         } catch (Exception e) {

@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
 public class CandidateService {
 
     /** Edit / delete / document removal are allowed only before any workflow progress. */
-    private static final Set<CandidateStatus> EDITABLE_STATUSES = EnumSet.of(CandidateStatus.DRAFT, CandidateStatus.ADDED);
+    private static final Set<CandidateStatus> EDITABLE_STATUSES = EnumSet.of(CandidateStatus.RESUME_PENDING, CandidateStatus.ADDED);
 
     /** Shortlist stage: first decision from ADDED, then only among these three outcomes. */
     private static final Set<CandidateStatus> SHORTLIST_DECISION_ALLOWED = EnumSet.of(
@@ -106,7 +106,7 @@ public class CandidateService {
                 .name(dto.getName())
                 .phone(dto.getPhone())
                 .email(dto.getEmail())
-                .status((resume != null && !resume.isEmpty()) ? CandidateStatus.ADDED : CandidateStatus.DRAFT)
+                .status((resume != null && !resume.isEmpty()) ? CandidateStatus.ADDED : CandidateStatus.RESUME_PENDING)
                 .build();
 
         if (resume != null && !resume.isEmpty()) {
@@ -161,7 +161,7 @@ public class CandidateService {
         if (photo != null && !photo.isEmpty()) {
             entity.setPhotoUrl(fileStorageService.store(photo, PHOTO_FOLDER));
         }
-        if (entity.getStatus() == CandidateStatus.DRAFT && entity.getResumeUrl() != null) {
+        if (entity.getStatus() == CandidateStatus.RESUME_PENDING && entity.getResumeUrl() != null) {
             entity.setStatus(CandidateStatus.ADDED);
         }
         return toDto(candidateRepository.save(entity));

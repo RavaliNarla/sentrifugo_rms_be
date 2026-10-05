@@ -1,8 +1,8 @@
 package com.sentrifugo.rms.db.enums;
 
 public enum CandidateStatus {
-    /** Bulk-imported without a resume - becomes ADDED once a resume is uploaded via Edit. */
-    DRAFT,
+    /** Bulk-imported without a resume - becomes ADDED once a resume is uploaded via Edit. (Formerly DRAFT.) */
+    RESUME_PENDING,
     ADDED,
     SHORTLISTED,
     /** Shortlist decision = REJECT. */
