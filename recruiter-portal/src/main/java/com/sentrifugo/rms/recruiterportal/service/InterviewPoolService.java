@@ -196,34 +196,29 @@ public class InterviewPoolService {
         boolean hasRationale = !rationale.isEmpty();
         boolean hasDecision = !decision.isEmpty();
         Map<String, Integer> competency = normalizeCompetency(request.getCompetencyRatings());
-        boolean competencyStarted = competency.values().stream().anyMatch(v -> v != null);
         String keyObservations = request.getKeyObservations() != null ? request.getKeyObservations().trim() : "";
 
-        if (competencyStarted) {
-            for (String key : COMPETENCY_KEYS) {
-                Integer v = competency.get(key);
-                if (v == null) {
-                    throw new CommonException("If any competency rating is filled, all five competencies must be rated (1–5).");
-                }
-                if (v < 1 || v > 5) {
-                    throw new CommonException("Competency ratings must be between 1 and 5.");
-                }
-            }
-            // Filling competency requires the main three fields as well.
-            if (!hasScore || !hasRationale || !hasDecision) {
-                throw new CommonException("Competency assessment requires Rating, Rationale, and Decision to be filled for this candidate.");
-            }
-        }
-
         boolean anyMain = hasScore || hasRationale || hasDecision;
-        if (!anyMain && !competencyStarted && keyObservations.isEmpty()) {
-            throw new CommonException("Nothing to save for this candidate. Fill Rating, Rationale, and Decision together.");
+        if (!anyMain && keyObservations.isEmpty()
+                && competency.values().stream().noneMatch(v -> v != null)) {
+            throw new CommonException("Nothing to save for this candidate. Fill Rating, Rationale, Decision, and Competency assessment together.");
         }
         if (anyMain && !(hasScore && hasRationale && hasDecision)) {
             throw new CommonException("For each candidate, Rating, Rationale, and Decision must all be filled together (or all left blank).");
         }
         if (!hasScore) {
             throw new CommonException("Rating is required when saving a score.");
+        }
+
+        // Competency assessment is mandatory for interviewers whenever they submit a score.
+        for (String key : COMPETENCY_KEYS) {
+            Integer v = competency.get(key);
+            if (v == null) {
+                throw new CommonException("Competency assessment is required. Rate all five competencies (1–5).");
+            }
+            if (v < 1 || v > 5) {
+                throw new CommonException("Competency ratings must be between 1 and 5.");
+            }
         }
 
         BigDecimal scoreValue = request.getScore().setScale(2, RoundingMode.HALF_UP);
@@ -246,7 +241,7 @@ public class InterviewPoolService {
         // Stored for recruiter visibility; does NOT drive QUALIFIED / DISQUALIFIED.
         score.setDecision(decision);
         try {
-            score.setCompetencyJson(competencyStarted ? objectMapper.writeValueAsString(competency) : null);
+            score.setCompetencyJson(objectMapper.writeValueAsString(competency));
         } catch (Exception e) {
             throw new CommonException("Could not save competency assessment.");
         }
@@ -273,22 +268,26 @@ public class InterviewPoolService {
             boolean qualified = average.compareTo(PASS_MARK) >= 0;
             candidate.setStatus(qualified ? CandidateStatus.QUALIFIED : CandidateStatus.DISQUALIFIED);
             candidateRepository.save(candidate);
-            try {
-                if (candidate.getEmail() != null && !candidate.getEmail().isBlank()) {
-                    JobPositionEntity position = jobPositionRepository.findById(candidate.getPositionId()).orElse(null);
-                    String positionTitle = position != null
-                            ? positionTitleRepository.findById(position.getPositionTitleId()).map(PositionTitleEntity::getName).orElse(null)
-                            : null;
-                    String locationName = position != null
-                            ? locationRepository.findById(position.getLocationId()).map(LocationEntity::getName).orElse(null)
-                            : null;
-                    RmsEmailTemplates.BuiltEmail email = emailTemplates.interviewOutcome(
-                            candidate.getName(), positionTitle, locationName, round, schedule.getRoundName(),
-                            qualified, schedule.getInterviewDate());
-                    emailTemplates.sendAsync(candidate.getEmail(), email, true, "interview-result.pdf");
+            // Email the candidate only on DISQUALIFIED. QUALIFIED stays silent so recruiters
+            // can schedule the next round without a premature "you passed" email.
+            if (!qualified) {
+                try {
+                    if (candidate.getEmail() != null && !candidate.getEmail().isBlank()) {
+                        JobPositionEntity position = jobPositionRepository.findById(candidate.getPositionId()).orElse(null);
+                        String positionTitle = position != null
+                                ? positionTitleRepository.findById(position.getPositionTitleId()).map(PositionTitleEntity::getName).orElse(null)
+                                : null;
+                        String locationName = position != null
+                                ? locationRepository.findById(position.getLocationId()).map(LocationEntity::getName).orElse(null)
+                                : null;
+                        RmsEmailTemplates.BuiltEmail email = emailTemplates.interviewOutcome(
+                                candidate.getName(), positionTitle, locationName, round, schedule.getRoundName(),
+                                false, schedule.getInterviewDate());
+                        emailTemplates.sendAsync(candidate.getEmail(), email, true, "interview-result.pdf");
+                    }
+                } catch (Exception e) {
+                    // best-effort email
                 }
-            } catch (Exception e) {
-                // best-effort email
             }
         }
     }

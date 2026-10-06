@@ -248,16 +248,35 @@ public class OfferService {
         for (CandidateOfferEntity o : offers) {
             List<UUID> owners = resolveOwnerRecipients(o);
             RmsEmailTemplates.HiringDetails details = resolveOfferHiringDetails(o);
+            String candidateLabel = details.candidateName() != null ? details.candidateName() : "candidate";
+            String reqLabel = details.requisitionCode() != null ? details.requisitionCode() : "requisition";
+            String offerLabel = candidateLabel + " (" + reqLabel + ")";
             if (approver.getApproverRole() == ApproverRole.L1) {
                 if (o.getStatus() == OfferStatus.L2_PENDING) {
                     notifyUsersAboutDecision(ApproverRole.L2, owners, "L1", true, "Awaiting your L2 approval.", details);
+                    notificationService.notifyAdminsAndRecruitersInApp(
+                            NotificationService.TYPE_OFFER_APPROVED,
+                            "Offer approved at L1 — awaiting L2: " + offerLabel + ".",
+                            currentUserId);
                 } else if (o.getStatus() == OfferStatus.L1_REJECTED) {
                     notifyUsersAboutDecision(null, owners, "L1", false, "The offer was rejected at L1.", details);
+                    notificationService.notifyAdminsAndRecruitersInApp(
+                            NotificationService.TYPE_OFFER_REJECTED,
+                            "Offer rejected at L1: " + offerLabel + ".",
+                            currentUserId);
                 }
             } else if (o.getStatus() == OfferStatus.L2_REJECTED) {
                 notifyUsersAboutDecision(null, owners, "L2", false, "The offer was rejected at L2.", details);
+                notificationService.notifyAdminsAndRecruitersInApp(
+                        NotificationService.TYPE_OFFER_REJECTED,
+                        "Offer rejected at L2: " + offerLabel + ".",
+                        currentUserId);
             } else if (o.getStatus() == OfferStatus.SENT) {
                 notifyUsersAboutDecision(null, owners, "L2", true, "The offer was approved and emailed to the candidate.", details);
+                notificationService.notifyAdminsAndRecruitersInApp(
+                        NotificationService.TYPE_OFFER_APPROVED,
+                        "Offer approved and sent: " + offerLabel + ".",
+                        currentUserId);
             }
         }
     }

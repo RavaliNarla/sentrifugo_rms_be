@@ -31,7 +31,11 @@ import java.util.UUID;
 public class NotificationService {
 
     public static final String TYPE_REQUISITION_SUBMITTED = "REQUISITION_SUBMITTED";
+    public static final String TYPE_REQUISITION_APPROVED = "REQUISITION_APPROVED";
+    public static final String TYPE_REQUISITION_REJECTED = "REQUISITION_REJECTED";
     public static final String TYPE_OFFER_SUBMITTED = "OFFER_SUBMITTED";
+    public static final String TYPE_OFFER_APPROVED = "OFFER_APPROVED";
+    public static final String TYPE_OFFER_REJECTED = "OFFER_REJECTED";
     public static final String TYPE_INTERVIEW_SCHEDULED = "INTERVIEW_SCHEDULED";
     public static final int VISIBLE_DAYS = 3;
 
@@ -73,6 +77,19 @@ public class NotificationService {
      */
     @Transactional
     public void notifyAdminsAndRecruiters(String type, String message, UUID sourceUserId) {
+        notifyAdminsAndRecruiters(type, message, sourceUserId, true);
+    }
+
+    /**
+     * In-app bell only (no email). Use when richer decision emails are already sent elsewhere.
+     */
+    @Transactional
+    public void notifyAdminsAndRecruitersInApp(String type, String message, UUID sourceUserId) {
+        notifyAdminsAndRecruiters(type, message, sourceUserId, false);
+    }
+
+    @Transactional
+    public void notifyAdminsAndRecruiters(String type, String message, UUID sourceUserId, boolean sendEmail) {
         List<UserEntity> recipients = userRepository.findByRoleIn(List.of(
                 UserRole.ADMIN.getValue(),
                 UserRole.RECRUITER.getValue()));
@@ -81,7 +98,7 @@ public class NotificationService {
         }
 
         List<NotificationEntity> rows = new ArrayList<>(recipients.size());
-        List<PendingEmail> emails = new ArrayList<>(recipients.size());
+        List<PendingEmail> emails = sendEmail ? new ArrayList<>(recipients.size()) : List.of();
         String subject = emailSubject(type);
         for (UserEntity user : recipients) {
             rows.add(NotificationEntity.builder()
@@ -92,10 +109,14 @@ public class NotificationService {
                     .sourceUserId(sourceUserId)
                     .build());
             // Still email the actor; only the unread badge is suppressed.
-            emails.add(new PendingEmail(user.getEmail(), user.getName(), subject, message));
+            if (sendEmail) {
+                emails.add(new PendingEmail(user.getEmail(), user.getName(), subject, message));
+            }
         }
         notificationRepository.saveAll(rows);
-        queueEmailsAfterCommit(emails);
+        if (sendEmail) {
+            queueEmailsAfterCommit(emails);
+        }
     }
 
     /**
@@ -177,7 +198,11 @@ public class NotificationService {
     private static String emailSubject(String type) {
         return switch (type) {
             case TYPE_REQUISITION_SUBMITTED -> "New requisition submitted for approval";
+            case TYPE_REQUISITION_APPROVED -> "Requisition approved";
+            case TYPE_REQUISITION_REJECTED -> "Requisition rejected";
             case TYPE_OFFER_SUBMITTED -> "New offer letter submitted for approval";
+            case TYPE_OFFER_APPROVED -> "Offer letter approved";
+            case TYPE_OFFER_REJECTED -> "Offer letter rejected";
             case TYPE_INTERVIEW_SCHEDULED -> "Interview scheduled";
             default -> "Sagar Recruitment Hub notification";
         };

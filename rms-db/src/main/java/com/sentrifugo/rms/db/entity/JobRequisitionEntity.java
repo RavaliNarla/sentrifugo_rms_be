@@ -49,6 +49,14 @@ public class JobRequisitionEntity extends BaseEntity<UUID> {
     @Column(name = "requisition_code", unique = true)
     private String requisitionCode;
 
+    /** Optional: when set, positions under this requisition inherit/lock this department. */
+    @Column(name = "department_id")
+    private UUID departmentId;
+
+    /** Optional: when set, positions under this requisition inherit/lock this location. */
+    @Column(name = "location_id")
+    private UUID locationId;
+
     @Column(name = "comments", columnDefinition = "TEXT")
     private String comments;
 }

@@ -1,5 +1,6 @@
 package com.sentrifugo.rms.masterportal.config;
 
+import com.sentrifugo.rms.common.util.MasterCodeUtil;
 import com.sentrifugo.rms.db.entity.*;
 import com.sentrifugo.rms.db.repository.*;
 import lombok.RequiredArgsConstructor;
@@ -7,7 +8,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -106,9 +110,17 @@ public class MasterDataSeeder implements CommandLineRunner {
     }
 
     private void seedDepartments() {
+        Set<String> used = new HashSet<>();
+        for (DepartmentEntity d : departmentRepository.findAll()) {
+            if (d.getCode() != null && !d.getCode().isBlank()) {
+                used.add(d.getCode().trim().toUpperCase(Locale.ROOT));
+            }
+        }
         for (String name : DEPARTMENTS) {
             if (!departmentRepository.existsByNameIgnoreCase(name)) {
-                departmentRepository.save(DepartmentEntity.builder().name(name).build());
+                String code = MasterCodeUtil.suggestFromName(name, used);
+                used.add(code);
+                departmentRepository.save(DepartmentEntity.builder().name(name).code(code).build());
             }
         }
     }
@@ -125,8 +137,16 @@ public class MasterDataSeeder implements CommandLineRunner {
             log.warn("No State master data found - skipping Location seed until at least one State exists.");
             return;
         }
+        Set<String> used = new HashSet<>();
+        for (LocationEntity l : locationRepository.findAll()) {
+            if (l.getCode() != null && !l.getCode().isBlank()) {
+                used.add(l.getCode().trim().toUpperCase(Locale.ROOT));
+            }
+        }
         for (String name : toAdd) {
-            locationRepository.save(LocationEntity.builder().name(name).stateId(stateId).build());
+            String code = MasterCodeUtil.suggestFromName(name, used);
+            used.add(code);
+            locationRepository.save(LocationEntity.builder().name(name).code(code).stateId(stateId).build());
         }
     }
 

@@ -30,7 +30,7 @@ public class NotificationEntity extends BaseEntity<UUID> {
     @Column(name = "user_id", nullable = false)
     private UUID userId;
 
-    /** REQUISITION_SUBMITTED | OFFER_SUBMITTED | INTERVIEW_SCHEDULED */
+    /** REQUISITION_SUBMITTED | REQUISITION_APPROVED | REQUISITION_REJECTED | OFFER_SUBMITTED | OFFER_APPROVED | OFFER_REJECTED | INTERVIEW_SCHEDULED */
     @Column(name = "type", nullable = false, length = 64)
     private String type;
 

@@ -6,6 +6,13 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.core.annotation.Order;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
+import com.sentrifugo.rms.common.util.MasterCodeUtil;
+
+import java.util.HashSet;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
 
 /**
  * Hibernate ddl-auto=update does not revise Postgres CHECK constraints.
@@ -61,6 +68,66 @@ public class SchemaConstraintFixer implements CommandLineRunner {
             log.info("Ensured recruitment.candidate_offers_status_check includes approval + decision statuses");
         } catch (Exception e) {
             log.warn("Could not refresh candidate_offers_status_check: {}", e.getMessage());
+        }
+
+        ensureMasterCodes();
+    }
+
+    /** Add unique 3-char codes on departments/locations and backfill existing rows. */
+    private void ensureMasterCodes() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE common.departments ADD COLUMN IF NOT EXISTS code varchar(3)");
+            jdbcTemplate.execute("ALTER TABLE common.locations ADD COLUMN IF NOT EXISTS code varchar(3)");
+        } catch (Exception e) {
+            log.warn("Could not add master code columns: {}", e.getMessage());
+            return;
+        }
+
+        try {
+            backfillCodes("common.departments");
+            backfillCodes("common.locations");
+        } catch (Exception e) {
+            log.warn("Could not backfill master codes: {}", e.getMessage());
+        }
+
+        try {
+            jdbcTemplate.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_departments_code
+                    ON common.departments (upper(code)) WHERE code IS NOT NULL
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_locations_code
+                    ON common.locations (upper(code)) WHERE code IS NOT NULL
+                    """);
+        } catch (Exception e) {
+            log.warn("Could not ensure master code unique indexes: {}", e.getMessage());
+        }
+    }
+
+    private void backfillCodes(String table) {
+        List<Map<String, Object>> rows = jdbcTemplate.queryForList(
+                "SELECT id, name, code FROM " + table + " ORDER BY created_date NULLS LAST, name");
+        Set<String> used = new HashSet<>();
+        for (Map<String, Object> row : rows) {
+            Object existing = row.get("code");
+            if (existing != null && !existing.toString().isBlank()) {
+                used.add(existing.toString().trim().toUpperCase(Locale.ROOT));
+            }
+        }
+        int updated = 0;
+        for (Map<String, Object> row : rows) {
+            Object existing = row.get("code");
+            if (existing != null && !existing.toString().isBlank()) {
+                continue;
+            }
+            String name = row.get("name") != null ? row.get("name").toString() : "";
+            String code = MasterCodeUtil.suggestFromName(name, used);
+            used.add(code);
+            jdbcTemplate.update("UPDATE " + table + " SET code = ? WHERE id = ?", code, row.get("id"));
+            updated++;
+        }
+        if (updated > 0) {
+            log.info("Backfilled {} code(s) on {}", updated, table);
         }
     }
 }

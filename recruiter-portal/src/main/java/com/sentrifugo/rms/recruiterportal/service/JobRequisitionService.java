@@ -5,6 +5,7 @@ import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
 import com.sentrifugo.rms.common.service.MailService;
 import com.sentrifugo.rms.common.service.NotificationService;
 import com.sentrifugo.rms.common.util.SecurityUtils;
+import com.sentrifugo.rms.db.entity.DepartmentEntity;
 import com.sentrifugo.rms.db.entity.JobPositionEntity;
 import com.sentrifugo.rms.db.entity.JobRequisitionEntity;
 import com.sentrifugo.rms.db.entity.LocationEntity;
@@ -14,6 +15,7 @@ import com.sentrifugo.rms.db.entity.RequisitionApproverEntity;
 import com.sentrifugo.rms.db.entity.UserEntity;
 import com.sentrifugo.rms.db.enums.ApproverRole;
 import com.sentrifugo.rms.db.enums.RequisitionStatus;
+import com.sentrifugo.rms.db.repository.DepartmentRepository;
 import com.sentrifugo.rms.db.repository.JobPositionRepository;
 import com.sentrifugo.rms.db.repository.JobRequisitionRepository;
 import com.sentrifugo.rms.db.repository.LocationRepository;
@@ -54,6 +56,7 @@ public class JobRequisitionService {
 
     private final JobRequisitionRepository jobRequisitionRepository;
     private final JobPositionRepository jobPositionRepository;
+    private final DepartmentRepository departmentRepository;
     private final PositionTitleRepository positionTitleRepository;
     private final LocationRepository locationRepository;
     private final RequisitionApproverRepository requisitionApproverRepository;
@@ -67,14 +70,20 @@ public class JobRequisitionService {
     @Transactional
     public JobRequisitionDTO create(JobRequisitionDTO dto) {
         validateDates(dto);
+        UUID departmentId = blankToNull(dto.getDepartmentId());
+        UUID locationId = blankToNull(dto.getLocationId());
+        String deptCode = resolveDepartmentCode(departmentId);
+        String locCode = resolveLocationCode(locationId);
         JobRequisitionEntity entity = JobRequisitionEntity.builder()
                 .title(dto.getTitle())
                 .description(dto.getDescription())
                 .startDate(dto.getStartDate())
                 .expectedFulfilmentDate(dto.getExpectedFulfilmentDate())
+                .departmentId(departmentId)
+                .locationId(locationId)
                 .status(RequisitionStatus.NEW)
                 .build();
-        entity.setRequisitionCode(generateRequisitionCode());
+        entity.setRequisitionCode(generateRequisitionCode(deptCode, locCode));
         JobRequisitionEntity saved = jobRequisitionRepository.save(entity);
         return toDto(saved);
     }
@@ -92,7 +101,7 @@ public class JobRequisitionService {
         entity.setDescription(dto.getDescription());
         entity.setStartDate(dto.getStartDate());
         entity.setExpectedFulfilmentDate(dto.getExpectedFulfilmentDate());
-        // Keep rejected status as-is after edit-save (do not reset to NEW).
+        // Department / location / requisition code stay as created (scope is fixed after create).
         return toDto(jobRequisitionRepository.save(entity));
     }
 
@@ -265,16 +274,36 @@ public class JobRequisitionService {
         for (JobRequisitionEntity req : requisitions) {
             List<UUID> owners = resolveOwnerRecipients(req);
             RmsEmailTemplates.HiringDetails details = resolveRequisitionHiringDetails(req);
+            String code = req.getRequisitionCode() != null ? req.getRequisitionCode() : req.getTitle();
             if (approver.getApproverRole() == ApproverRole.L1) {
                 if (request.isApprove()) {
                     notifyUsersAboutDecision(ApproverRole.L2, owners, "L1", true, "Awaiting your L2 approval.", details);
+                    notificationService.notifyAdminsAndRecruitersInApp(
+                            NotificationService.TYPE_REQUISITION_APPROVED,
+                            "Requisition approved at L1 — awaiting L2: " + code + ".",
+                            currentUserId);
                 } else {
                     notifyUsersAboutDecision(null, owners, "L1", false, "The requisition was rejected at L1.", details);
+                    notificationService.notifyAdminsAndRecruitersInApp(
+                            NotificationService.TYPE_REQUISITION_REJECTED,
+                            "Requisition rejected at L1: " + code + ".",
+                            currentUserId);
                 }
             } else {
                 notifyUsersAboutDecision(null, owners, "L2", request.isApprove(),
                         request.isApprove() ? "The requisition is now approved." : "The requisition was rejected at L2.",
                         details);
+                if (request.isApprove()) {
+                    notificationService.notifyAdminsAndRecruitersInApp(
+                            NotificationService.TYPE_REQUISITION_APPROVED,
+                            "Requisition approved: " + code + ".",
+                            currentUserId);
+                } else {
+                    notificationService.notifyAdminsAndRecruitersInApp(
+                            NotificationService.TYPE_REQUISITION_REJECTED,
+                            "Requisition rejected at L2: " + code + ".",
+                            currentUserId);
+                }
             }
         }
     }
@@ -412,12 +441,68 @@ public class JobRequisitionService {
     }
 
 
-    private String generateRequisitionCode() {
+    private String generateRequisitionCode(String departmentCode, String locationCode) {
         Long seq = jobRequisitionRepository.nextRequisitionCodeSeq();
-        return "REQ-" + IstTime.today().getYear() + "-" + String.format("%05d", seq);
+        String year = String.valueOf(IstTime.today().getYear());
+        String seqPart = String.format("%05d", seq);
+        StringBuilder sb = new StringBuilder("REQ");
+        if (departmentCode != null && !departmentCode.isBlank()) {
+            sb.append('-').append(departmentCode.trim().toUpperCase());
+        }
+        if (locationCode != null && !locationCode.isBlank()) {
+            sb.append('-').append(locationCode.trim().toUpperCase());
+        }
+        sb.append('-').append(year).append('-').append(seqPart);
+        return sb.toString();
+    }
+
+    private UUID blankToNull(UUID id) {
+        return id;
+    }
+
+    private String resolveDepartmentCode(UUID departmentId) {
+        if (departmentId == null) {
+            return null;
+        }
+        DepartmentEntity dept = departmentRepository.findById(departmentId)
+                .orElseThrow(() -> new CommonException("Selected department was not found."));
+        if (dept.getCode() == null || dept.getCode().isBlank()) {
+            throw new CommonException("Selected department does not have a 3-character code. Update it in Admin → Departments.");
+        }
+        return dept.getCode().trim().toUpperCase();
+    }
+
+    private String resolveLocationCode(UUID locationId) {
+        if (locationId == null) {
+            return null;
+        }
+        LocationEntity loc = locationRepository.findById(locationId)
+                .orElseThrow(() -> new CommonException("Selected location was not found."));
+        if (loc.getCode() == null || loc.getCode().isBlank()) {
+            throw new CommonException("Selected location does not have a 3-character code. Update it in Admin → Locations.");
+        }
+        return loc.getCode().trim().toUpperCase();
     }
 
     private JobRequisitionDTO toDto(JobRequisitionEntity entity) {
+        String departmentName = null;
+        String departmentCode = null;
+        if (entity.getDepartmentId() != null) {
+            DepartmentEntity dept = departmentRepository.findById(entity.getDepartmentId()).orElse(null);
+            if (dept != null) {
+                departmentName = dept.getName();
+                departmentCode = dept.getCode();
+            }
+        }
+        String locationName = null;
+        String locationCode = null;
+        if (entity.getLocationId() != null) {
+            LocationEntity loc = locationRepository.findById(entity.getLocationId()).orElse(null);
+            if (loc != null) {
+                locationName = loc.getName();
+                locationCode = loc.getCode();
+            }
+        }
         return JobRequisitionDTO.builder()
                 .id(entity.getId())
                 .title(entity.getTitle())
@@ -427,6 +512,12 @@ public class JobRequisitionService {
                 .status(entity.getStatus().name())
                 .requisitionCode(entity.getRequisitionCode())
                 .comments(entity.getComments())
+                .departmentId(entity.getDepartmentId())
+                .departmentName(departmentName)
+                .departmentCode(departmentCode)
+                .locationId(entity.getLocationId())
+                .locationName(locationName)
+                .locationCode(locationCode)
                 .build();
     }
 }

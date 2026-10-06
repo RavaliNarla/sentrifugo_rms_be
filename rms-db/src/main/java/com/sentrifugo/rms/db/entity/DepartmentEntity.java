@@ -27,6 +27,10 @@ public class DepartmentEntity extends BaseEntity<UUID> {
     @Column(name = "name", nullable = false, unique = true)
     private String name;
 
+    /** 3-char code used in requisition numbers (e.g. HR for Human Resources). */
+    @Column(name = "code", length = 3, unique = true)
+    private String code;
+
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 }

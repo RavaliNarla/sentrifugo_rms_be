@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class DashboardSummaryDTO {
     private long totalRequisitions;
     private long pendingApprovalRequisitions;
+    private long pendingApprovalOffers;
     private long approvedRequisitions;
     private long fulfilledRequisitions;
     private long totalCandidates;

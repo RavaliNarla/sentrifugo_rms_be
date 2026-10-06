@@ -48,6 +48,7 @@ public class JobPositionService {
             throw new CommonException("Positions can only be added while the requisition is editable (NEW/REJECTED).");
         }
 
+        applyRequisitionScope(requisition, dto);
         validateMandatoryFields(dto);
         if (approvalDoc == null || approvalDoc.isEmpty()) {
             throw new CommonException("Upload Approval Email/Document is required.");
@@ -73,6 +74,9 @@ public class JobPositionService {
         JobPositionEntity entity = jobPositionRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Position not found"));
 
+        JobRequisitionEntity requisition = jobRequisitionRepository.findById(entity.getRequisitionId())
+                .orElseThrow(() -> new ResourceNotFoundException("Requisition not found"));
+        applyRequisitionScope(requisition, dto);
         validateMandatoryFields(dto);
         if ((approvalDoc == null || approvalDoc.isEmpty()) && entity.getApprovalDocUrl() == null) {
             throw new CommonException("Upload Approval Email/Document is required.");
@@ -113,6 +117,25 @@ public class JobPositionService {
         entity.setApprovedById(dto.getApprovedById());
         entity.setApprovedByOtherText(dto.getApprovedByOtherText());
         entity.setApprovedOn(dto.getApprovedOn());
+    }
+
+    /**
+     * When the parent requisition scoped a department and/or location, force those onto the position
+     * (UI locks the fields; this is the server-side guarantee).
+     */
+    private void applyRequisitionScope(JobRequisitionEntity requisition, JobPositionDTO dto) {
+        if (requisition.getDepartmentId() != null) {
+            if (dto.getDepartmentId() != null && !requisition.getDepartmentId().equals(dto.getDepartmentId())) {
+                throw new CommonException("Department is fixed by this requisition and cannot be changed.");
+            }
+            dto.setDepartmentId(requisition.getDepartmentId());
+        }
+        if (requisition.getLocationId() != null) {
+            if (dto.getLocationId() != null && !requisition.getLocationId().equals(dto.getLocationId())) {
+                throw new CommonException("Location is fixed by this requisition and cannot be changed.");
+            }
+            dto.setLocationId(requisition.getLocationId());
+        }
     }
 
     private void validateMandatoryFields(JobPositionDTO dto) {

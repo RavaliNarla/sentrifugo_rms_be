@@ -32,9 +32,9 @@ public class ScoreSubmitRequest {
     private String decision;
 
     /**
-     * Optional competency ratings (1–5). Keys:
+     * Competency ratings (1–5). Keys:
      * TECHNICAL_KNOWLEDGE, RELEVANT_EXPERIENCE, COMMUNICATION, PROBLEM_SOLVING, ATTITUDE_APPROACH.
-     * If any value is set, all five are required.
+     * All five are required when submitting a score.
      */
     private Map<String, Integer> competencyRatings;
 

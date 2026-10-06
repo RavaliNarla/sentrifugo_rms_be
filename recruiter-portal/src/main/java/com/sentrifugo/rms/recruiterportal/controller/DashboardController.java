@@ -34,8 +34,10 @@ public class DashboardController {
     @GetMapping("/summary")
     public ResponseEntity<ApiResponse<DashboardSummaryDTO>> summary() {
         long total = jobRequisitionRepository.count();
-        long pending = jobRequisitionRepository.findByStatusIn(
+        long pendingRequisitions = jobRequisitionRepository.findByStatusIn(
                 java.util.List.of(RequisitionStatus.L1_PENDING, RequisitionStatus.L2_PENDING)).size();
+        long pendingOffers = candidateOfferRepository.findByStatusIn(
+                java.util.List.of(OfferStatus.L1_PENDING, OfferStatus.L2_PENDING)).size();
         long approved = jobRequisitionRepository.findByStatus(RequisitionStatus.APPROVED).size();
         long fulfilled = jobRequisitionRepository.findByStatus(RequisitionStatus.FULFILLED).size();
 
@@ -43,12 +45,17 @@ public class DashboardController {
         long shortlisted = candidateRepository.findAll().stream().filter(c -> c.getStatus() == CandidateStatus.SHORTLISTED).count();
         long scheduled = candidateRepository.findAll().stream().filter(c -> c.getStatus() == CandidateStatus.SCHEDULED).count();
         long qualified = candidateRepository.findAll().stream().filter(c -> c.getStatus() == CandidateStatus.QUALIFIED).count();
+        // Offers that reached the candidate (not L1/L2 approval-queue statuses).
         long offersSent = candidateOfferRepository.findAll().stream()
-                .filter(o -> o.getStatus() == OfferStatus.SENT || o.getStatus() == OfferStatus.ACCEPTED).count();
+                .filter(o -> o.getStatus() == OfferStatus.SENT
+                        || o.getStatus() == OfferStatus.ACCEPTED
+                        || o.getStatus() == OfferStatus.REJECTED)
+                .count();
 
         DashboardSummaryDTO summary = DashboardSummaryDTO.builder()
                 .totalRequisitions(total)
-                .pendingApprovalRequisitions(pending)
+                .pendingApprovalRequisitions(pendingRequisitions)
+                .pendingApprovalOffers(pendingOffers)
                 .approvedRequisitions(approved)
                 .fulfilledRequisitions(fulfilled)
                 .totalCandidates(totalCandidates)

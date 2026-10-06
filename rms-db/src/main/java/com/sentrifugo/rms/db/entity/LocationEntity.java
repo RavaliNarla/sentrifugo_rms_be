@@ -27,6 +27,10 @@ public class LocationEntity extends BaseEntity<UUID> {
     @Column(name = "name", nullable = false)
     private String name;
 
+    /** 3-char code used in requisition numbers (e.g. HYD for Hyderabad). */
+    @Column(name = "code", length = 3, unique = true)
+    private String code;
+
     @Column(name = "state_id", nullable = false)
     private UUID stateId;
 

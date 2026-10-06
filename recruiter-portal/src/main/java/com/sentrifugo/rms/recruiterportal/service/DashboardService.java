@@ -35,13 +35,13 @@ public class DashboardService {
         return switch (key) {
             case "TOTAL_REQUISITIONS" -> requisitionDetails(
                     "TOTAL_REQUISITIONS", "Total Requisitions", jobRequisitionRepository.findAll());
-            case "PENDING_APPROVAL" -> requisitionDetails(
-                    "PENDING_APPROVAL", "Pending Approval",
+            case "PENDING_APPROVAL", "REQUISITIONS_PENDING_APPROVAL" -> requisitionDetails(
+                    "REQUISITIONS_PENDING_APPROVAL", "Requisitions Pending Approval",
                     jobRequisitionRepository.findByStatusIn(List.of(RequisitionStatus.L1_PENDING, RequisitionStatus.L2_PENDING)));
             case "APPROVED" -> requisitionDetails(
-                    "APPROVED", "Approved", jobRequisitionRepository.findByStatus(RequisitionStatus.APPROVED));
+                    "APPROVED", "Approved Requisitions", jobRequisitionRepository.findByStatus(RequisitionStatus.APPROVED));
             case "FULFILLED" -> requisitionDetails(
-                    "FULFILLED", "Fulfilled", jobRequisitionRepository.findByStatus(RequisitionStatus.FULFILLED));
+                    "FULFILLED", "Fulfilled Requisitions", jobRequisitionRepository.findByStatus(RequisitionStatus.FULFILLED));
             case "TOTAL_CANDIDATES" -> candidateDetails(
                     "TOTAL_CANDIDATES", "Total Candidates", candidateRepository.findAll());
             case "SHORTLISTED" -> candidateDetails(
@@ -53,10 +53,15 @@ public class DashboardService {
             case "QUALIFIED" -> candidateDetails(
                     "QUALIFIED", "Qualified",
                     candidateRepository.findAll().stream().filter(c -> c.getStatus() == CandidateStatus.QUALIFIED).toList());
+            case "OFFERS_PENDING_APPROVAL" -> offerDetails(
+                    "OFFERS_PENDING_APPROVAL", "Offers Pending Approval",
+                    candidateOfferRepository.findByStatusIn(List.of(OfferStatus.L1_PENDING, OfferStatus.L2_PENDING)));
             case "OFFERS_SENT" -> offerDetails(
                     "OFFERS_SENT", "Offers Sent",
                     candidateOfferRepository.findAll().stream()
-                            .filter(o -> o.getStatus() == OfferStatus.SENT || o.getStatus() == OfferStatus.ACCEPTED)
+                            .filter(o -> o.getStatus() == OfferStatus.SENT
+                                    || o.getStatus() == OfferStatus.ACCEPTED
+                                    || o.getStatus() == OfferStatus.REJECTED)
                             .toList());
             default -> throw new CommonException("Unknown dashboard metric: " + metricKey);
         };
@@ -143,10 +148,10 @@ public class DashboardService {
                     String statusLabel;
                     if (o.getStatus() == OfferStatus.SENT) {
                         statusLabel = "OFFER LETTER SENT";
-                    } else if (o.getStatus() == OfferStatus.REJECTED
-                            || o.getStatus() == OfferStatus.L1_REJECTED
-                            || o.getStatus() == OfferStatus.L2_REJECTED) {
-                        statusLabel = "REJECTED";
+                    } else if (o.getStatus() == OfferStatus.ACCEPTED) {
+                        statusLabel = "OFFER ACCEPTED";
+                    } else if (o.getStatus() == OfferStatus.REJECTED) {
+                        statusLabel = "OFFER REJECTED";
                     } else {
                         statusLabel = o.getStatus() != null ? o.getStatus().name().replace('_', ' ') : "-";
                     }

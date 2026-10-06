@@ -1,6 +1,8 @@
 package com.sentrifugo.rms.masterportal.service;
 
+import com.sentrifugo.rms.common.exception.CommonException;
 import com.sentrifugo.rms.common.exception.ResourceNotFoundException;
+import com.sentrifugo.rms.common.util.MasterCodeUtil;
 import com.sentrifugo.rms.db.entity.LocationEntity;
 import com.sentrifugo.rms.db.entity.StateEntity;
 import com.sentrifugo.rms.db.repository.LocationRepository;
@@ -46,8 +48,13 @@ public class LocationService {
     }
 
     public LocationDTO add(LocationDTO dto) {
+        String code = MasterCodeUtil.normalizeRequired(dto.getCode(), "Location");
+        if (locationRepository.existsByCodeIgnoreCase(code)) {
+            throw new CommonException("A location with code '" + code + "' already exists.");
+        }
         LocationEntity entity = LocationEntity.builder()
-                .name(dto.getName())
+                .name(dto.getName().trim())
+                .code(code)
                 .stateId(dto.getStateId())
                 .address(dto.getAddress())
                 .build();
@@ -58,7 +65,12 @@ public class LocationService {
     public LocationDTO update(UUID id, LocationDTO dto) {
         LocationEntity entity = locationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Location not found"));
-        entity.setName(dto.getName());
+        String code = MasterCodeUtil.normalizeRequired(dto.getCode(), "Location");
+        if (locationRepository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
+            throw new CommonException("A location with code '" + code + "' already exists.");
+        }
+        entity.setName(dto.getName().trim());
+        entity.setCode(code);
         entity.setStateId(dto.getStateId());
         entity.setAddress(dto.getAddress());
         locationRepository.save(entity);
@@ -80,6 +92,7 @@ public class LocationService {
         return LocationDTO.builder()
                 .id(entity.getId())
                 .name(entity.getName())
+                .code(entity.getCode())
                 .stateId(entity.getStateId())
                 .stateName(stateName)
                 .address(entity.getAddress())

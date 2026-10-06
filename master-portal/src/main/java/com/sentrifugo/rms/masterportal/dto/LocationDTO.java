@@ -19,6 +19,9 @@ public class LocationDTO {
     @NotBlank(message = "Location name is required")
     private String name;
 
+    @NotBlank(message = "Code is required")
+    private String code;
+
     @NotNull(message = "State is required")
     private UUID stateId;
 

@@ -179,14 +179,8 @@ public class SchemaConstraintFixer implements CommandLineRunner {
             log.warn("Could not ensure panel_member_scores competency columns: {}", e.getMessage());
         }
 
-        // Standard = concise modern letter (template2); Formal = full client SCL offer letter (template1).
-        // Ignore any Appointment Letter option in the dropdown.
+        // Formal (template1) is the only active offer letter. Deactivate Standard + Appointment.
         try {
-            jdbcTemplate.update("""
-                    UPDATE common.offer_templates
-                    SET file_name = 'template2.html', name = 'Standard Offer Letter'
-                    WHERE LOWER(COALESCE(name, '')) LIKE '%standard%'
-                    """);
             jdbcTemplate.update("""
                     UPDATE common.offer_templates
                     SET file_name = 'template1.html', name = 'Formal Offer Letter'
@@ -196,11 +190,22 @@ public class SchemaConstraintFixer implements CommandLineRunner {
                     UPDATE common.offer_templates
                     SET is_active = false
                     WHERE COALESCE(is_active, true) = true
-                      AND LOWER(COALESCE(name, '')) LIKE '%appointment%'
+                      AND (
+                        LOWER(COALESCE(name, '')) LIKE '%standard%'
+                        OR LOWER(COALESCE(name, '')) LIKE '%appointment%'
+                      )
                     """);
-            log.info("Aligned offer templates: Standard→template2, Formal→template1; deactivated appointment rows={}", deactivated);
+            log.info("Aligned Formal→template1; deactivated Standard/Appointment rows={}", deactivated);
         } catch (Exception e) {
             log.warn("Could not align offer template mapping: {}", e.getMessage());
+        }
+
+        try {
+            jdbcTemplate.execute("ALTER TABLE recruitment.job_requisitions ADD COLUMN IF NOT EXISTS department_id uuid");
+            jdbcTemplate.execute("ALTER TABLE recruitment.job_requisitions ADD COLUMN IF NOT EXISTS location_id uuid");
+            log.info("Ensured recruitment.job_requisitions optional department_id / location_id");
+        } catch (Exception e) {
+            log.warn("Could not ensure job_requisitions department/location columns: {}", e.getMessage());
         }
     }
 }

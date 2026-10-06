@@ -14,6 +14,8 @@ public interface DepartmentRepository extends JpaRepository<DepartmentEntity, UU
     List<DepartmentEntity> findAllByOrderByNameAsc();
     List<DepartmentEntity> findByNameContainingIgnoreCaseOrderByNameAsc(String name);
     boolean existsByNameIgnoreCase(String name);
+    boolean existsByCodeIgnoreCase(String code);
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, UUID id);
 
     // Paginated variants for the admin list screen (the unpaginated methods above stay as-is
     // since they're also used to populate dropdowns elsewhere, which need the full list).

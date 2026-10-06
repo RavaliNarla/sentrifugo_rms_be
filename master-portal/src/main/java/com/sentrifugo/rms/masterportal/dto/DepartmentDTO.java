@@ -8,7 +8,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.UUID;
 
-/** Department master: name plus an optional description. */
+/** Department master: name, unique 3-char code, optional description. */
 @Data
 @Builder
 @NoArgsConstructor
@@ -18,6 +18,9 @@ public class DepartmentDTO {
 
     @NotBlank(message = "Name is required")
     private String name;
+
+    @NotBlank(message = "Code is required")
+    private String code;
 
     private String description;
 }

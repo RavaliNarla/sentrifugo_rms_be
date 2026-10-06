@@ -33,5 +33,16 @@ public class JobRequisitionDTO {
     private String status;
     private String requisitionCode;
     private String comments;
+
+    /** Optional scope: when set, positions inherit/lock this department. */
+    private UUID departmentId;
+    private String departmentName;
+    private String departmentCode;
+
+    /** Optional scope: when set, positions inherit/lock this location. */
+    private UUID locationId;
+    private String locationName;
+    private String locationCode;
+
     private List<JobPositionDTO> positions;
 }

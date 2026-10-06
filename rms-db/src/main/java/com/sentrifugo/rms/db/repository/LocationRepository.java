@@ -14,11 +14,14 @@ import java.util.UUID;
 @Repository
 public interface LocationRepository extends JpaRepository<LocationEntity, UUID> {
     List<LocationEntity> findAllByOrderByNameAsc();
+    boolean existsByCodeIgnoreCase(String code);
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, UUID id);
 
     @Query("""
         SELECT l FROM LocationEntity l
         WHERE LOWER(l.name) LIKE LOWER(CONCAT('%', :search, '%'))
            OR LOWER(l.address) LIKE LOWER(CONCAT('%', :search, '%'))
+           OR LOWER(l.code) LIKE LOWER(CONCAT('%', :search, '%'))
         ORDER BY l.name ASC
         """)
     List<LocationEntity> search(@Param("search") String search);
@@ -31,6 +34,7 @@ public interface LocationRepository extends JpaRepository<LocationEntity, UUID> 
         SELECT l FROM LocationEntity l
         WHERE LOWER(l.name) LIKE LOWER(CONCAT('%', :search, '%'))
            OR LOWER(l.address) LIKE LOWER(CONCAT('%', :search, '%'))
+           OR LOWER(l.code) LIKE LOWER(CONCAT('%', :search, '%'))
         ORDER BY l.name ASC
         """)
     Page<LocationEntity> search(@Param("search") String search, Pageable pageable);
