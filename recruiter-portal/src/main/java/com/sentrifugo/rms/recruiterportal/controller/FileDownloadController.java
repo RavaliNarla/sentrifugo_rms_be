@@ -16,12 +16,10 @@ import jakarta.servlet.http.HttpServletRequest;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 
 /**
- * Serves resumes, ID proofs, approval documents, and generated offer PDFs stored on
- * local disk. Path is everything after "/files/" - candidate resumes and offer PDFs are
- * previewed inline (PDF viewer popup) via this endpoint.
+ * Serves resumes, ID proofs, approval documents, and generated offer PDFs from blob storage.
+ * Path is everything after "/files/" — previewed inline via this endpoint.
  */
 @Tag(name = "File Preview / Download")
 @RestController
@@ -40,14 +38,24 @@ public class FileDownloadController {
         String relativePath = UriUtils.decode(fullPath.substring(idx + marker.length()), StandardCharsets.UTF_8);
 
         Resource resource = fileStorageService.load(relativePath);
-        String contentType = Files.probeContentType(resource.getFile().toPath());
-        if (contentType == null) {
-            contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        String filename = resource.getFilename() != null ? resource.getFilename() : relativePath;
+        String contentType = MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        // Blob resources are streams — do not call resource.getFile() (local-disk only).
+        if (filename.toLowerCase().endsWith(".pdf")) {
+            contentType = MediaType.APPLICATION_PDF_VALUE;
+        } else if (filename.toLowerCase().endsWith(".png")) {
+            contentType = MediaType.IMAGE_PNG_VALUE;
+        } else if (filename.toLowerCase().endsWith(".jpg") || filename.toLowerCase().endsWith(".jpeg")) {
+            contentType = MediaType.IMAGE_JPEG_VALUE;
         }
 
-        return ResponseEntity.ok()
+        ResponseEntity.BodyBuilder ok = ResponseEntity.ok()
                 .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + resource.getFilename() + "\"")
-                .body(resource);
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"");
+        long len = resource.contentLength();
+        if (len >= 0) {
+            ok.contentLength(len);
+        }
+        return ok.body(resource);
     }
 }

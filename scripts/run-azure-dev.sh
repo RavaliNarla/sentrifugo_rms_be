@@ -1,29 +1,25 @@
 #!/usr/bin/env bash
-# Start all three RMS portals on the bobdev Linux host (java -jar).
+# Start all three RMS portals on Sentrifugo-RM1 (java -jar).
 # Usage:
-#   export DB_PASSWORD='...'
+#   export VAULT_ROLE_ID='...'
+#   export VAULT_SECRET_ID='...'
 #   ./scripts/run-azure-dev.sh
-#
-# Expects fat jars already built:
-#   mvn -DskipTests clean package
-# and copied next to this script's repo root under each module's target/.
 
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROFILE=azure-dev
 HEAP="-Xms128m -Xmx768m"
 
-if [[ -z "${DB_PASSWORD:-}" ]]; then
-  echo "ERROR: set DB_PASSWORD before running." >&2
+if [[ -z "${VAULT_ROLE_ID:-}" ]]; then
+  echo "ERROR: set VAULT_ROLE_ID before running." >&2
   exit 1
 fi
-if [[ -z "${SSL_KEYSTORE_PASSWORD:-}" ]]; then
-  echo "ERROR: set SSL_KEYSTORE_PASSWORD (same as BOB_JAVA vault v-ssl-pass / keystore pass)." >&2
+if [[ -z "${VAULT_SECRET_ID:-}" ]]; then
+  echo "ERROR: set VAULT_SECRET_ID before running." >&2
   exit 1
 fi
 
-mkdir -p /opt/app-jars/uploads/recruiter-portal /opt/app-jars/uploads/master-portal /opt/app-jars/logs
+mkdir -p /opt/app-jars/logs
 
 start_one() {
   local name="$1"
@@ -33,7 +29,7 @@ start_one() {
     exit 1
   fi
   echo "Starting $name ..."
-  DB_PASSWORD="$DB_PASSWORD" SSL_KEYSTORE_PASSWORD="$SSL_KEYSTORE_PASSWORD" \
+  VAULT_ROLE_ID="$VAULT_ROLE_ID" VAULT_SECRET_ID="$VAULT_SECRET_ID" \
     nohup java $HEAP \
     -Dspring.profiles.active="$PROFILE" \
     -jar "$jar" \
