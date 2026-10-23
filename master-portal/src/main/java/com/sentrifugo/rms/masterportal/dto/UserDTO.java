@@ -26,12 +26,9 @@ public class UserDTO {
     @Email(message = "Email must be valid")
     private String email;
 
-    /** System-generated on create (EMP0001…). Read-only for clients. */
+    /** HRMS employee code. Required when adding a user. */
     private String employeeId;
 
-    /**
-     * Plain password — required when creating a user; never returned from the API.
-     * Leave blank/null on update to keep the existing password.
-     */
+    /** Unused for HRMS-linked users. Left for older update payloads. */
     private String password;
 }

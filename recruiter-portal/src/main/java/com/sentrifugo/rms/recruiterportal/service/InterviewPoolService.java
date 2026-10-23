@@ -283,7 +283,7 @@ public class InterviewPoolService {
                         RmsEmailTemplates.BuiltEmail email = emailTemplates.interviewOutcome(
                                 candidate.getName(), positionTitle, locationName, round, schedule.getRoundName(),
                                 false, schedule.getInterviewDate());
-                        emailTemplates.sendAsync(candidate.getEmail(), email, true, "interview-result.pdf");
+                        emailTemplates.sendCandidateAsync(candidate.getEmail(), email, true, "interview-result.pdf");
                     }
                 } catch (Exception e) {
                     // best-effort email

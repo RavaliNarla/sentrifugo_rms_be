@@ -454,7 +454,7 @@ public class OfferService {
             RmsEmailTemplates.BuiltEmail toCandidate = accept
                     ? emailTemplates.offerAccepted(candidate.getName(), designation, location, offer.getJoiningDate())
                     : emailTemplates.offerDeclined(candidate.getName(), designation, location);
-            emailTemplates.sendAsync(candidate.getEmail(), toCandidate, true,
+            emailTemplates.sendCandidateAsync(candidate.getEmail(), toCandidate, true,
                     accept ? "offer-acceptance.pdf" : "offer-acknowledgement.pdf");
 
             String reqCode = jobRequisitionRepository.findById(candidate.getRequisitionId())
@@ -547,7 +547,7 @@ public class OfferService {
                     acceptUrl, rejectUrl, null);
             List<MailService.Attachment> attachments = List.of(
                     new MailService.Attachment("offer-letter.pdf", pdfBytes, "application/pdf"));
-            emailTemplates.sendSyncWithAttachments(candidate.getEmail(), email, attachments);
+            emailTemplates.sendCandidateSyncWithAttachments(candidate.getEmail(), email, attachments);
         } catch (Exception ex) {
             log.warn("Failed to send offer email: {}", ex.getMessage());
         }

@@ -1022,7 +1022,7 @@ public class InterviewSchedulingService {
         byte[] ics = IcsCalendarBuilder.singleEventIcs(event);
         List<MailService.Attachment> attachments = List.of(
                 new MailService.Attachment("interview-invite.ics", ics, IcsCalendarBuilder.CONTENT_TYPE));
-        return new PendingMail(candidate.getEmail(), email.subject(), email.html(), attachments);
+        return new PendingMail(candidate.getEmail(), email.subject(), email.html(), attachments, true);
     }
 
     private void notifyRecruiterOfInviteDecision(InterviewScheduleEntity schedule, CandidateEntity candidate, boolean accepted) {
@@ -1083,7 +1083,7 @@ public class InterviewSchedulingService {
         List<MailService.Attachment> attachments = files.stream()
                 .map(f -> new MailService.Attachment(f.fileName(), f.bytes(), IcsCalendarBuilder.CONTENT_TYPE))
                 .toList();
-        return new PendingMail(user.getEmail(), email.subject(), email.html(), attachments);
+        return new PendingMail(user.getEmail(), email.subject(), email.html(), attachments, false);
     }
 
     private static String escape(String value) {
@@ -1098,7 +1098,13 @@ public class InterviewSchedulingService {
         Runnable send = () -> {
             for (PendingMail mail : mails) {
                 try {
-                    mailService.sendHtmlEmailAsync(mail.to(), mail.subject(), mail.html(), mail.attachments());
+                    if (mail.candidate()) {
+                        mailService.sendCandidateHtmlEmailAsync(
+                                mail.to(), mail.subject(), mail.html(), mail.attachments());
+                    } else {
+                        mailService.sendHtmlEmailAsync(
+                                mail.to(), mail.subject(), mail.html(), mail.attachments());
+                    }
                 } catch (Exception e) {
                     log.warn("Failed to queue interview email to {}: {}", mail.to(), e.getMessage());
                 }
@@ -1116,6 +1122,7 @@ public class InterviewSchedulingService {
         }
     }
 
-    private record PendingMail(String to, String subject, String html, List<MailService.Attachment> attachments) {
+    private record PendingMail(String to, String subject, String html, List<MailService.Attachment> attachments,
+                               boolean candidate) {
     }
 }

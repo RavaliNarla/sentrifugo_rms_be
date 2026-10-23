@@ -35,11 +35,36 @@ public class RmsEmailTemplates {
     }
 
     public void sendAsync(String to, BuiltEmail email, boolean attachPdf, String pdfFileName) {
+        dispatch(to, email, attachPdf, pdfFileName, null, false, true);
+    }
+
+    /** Candidate mail still leaves through SMTP. Every other send is captured in Mailpit. */
+    public void sendCandidateAsync(String to, BuiltEmail email, boolean attachPdf, String pdfFileName) {
+        dispatch(to, email, attachPdf, pdfFileName, null, true, true);
+    }
+
+    public void sendSyncWithAttachments(String to, BuiltEmail email, List<MailService.Attachment> extra) {
+        dispatch(to, email, false, null, extra, false, false);
+    }
+
+    public void sendCandidateSyncWithAttachments(String to, BuiltEmail email, List<MailService.Attachment> extra) {
+        dispatch(to, email, false, null, extra, true, false);
+    }
+
+    public void sendAsyncWithAttachments(String to, BuiltEmail email, List<MailService.Attachment> extra) {
+        dispatch(to, email, false, null, extra, false, true);
+    }
+
+    private void dispatch(String to, BuiltEmail email, boolean attachPdf, String pdfFileName,
+                          List<MailService.Attachment> extra, boolean candidate, boolean async) {
         if (to == null || to.isBlank() || email == null) {
             return;
         }
         try {
             List<MailService.Attachment> attachments = new ArrayList<>();
+            if (extra != null) {
+                attachments.addAll(extra);
+            }
             if (attachPdf) {
                 try {
                     byte[] pdf = pdfConverterService.convertHtmlStringToPdf(wrapPrintable(email.html()));
@@ -49,36 +74,19 @@ public class RmsEmailTemplates {
                     log.warn("PDF attach failed for {}: {}", email.subject(), e.getMessage());
                 }
             }
-            if (attachments.isEmpty()) {
-                mailService.sendHtmlEmailAsync(to, email.subject(), email.html());
+            List<MailService.Attachment> files = attachments.isEmpty() ? null : attachments;
+            if (candidate && async) {
+                mailService.sendCandidateHtmlEmailAsync(to, email.subject(), email.html(), files);
+            } else if (candidate) {
+                mailService.sendCandidateHtmlEmail(to, email.subject(), email.html(), files);
+            } else if (async) {
+                mailService.sendHtmlEmailAsync(to, email.subject(), email.html(), files);
             } else {
-                mailService.sendHtmlEmailAsync(to, email.subject(), email.html(), attachments);
+                mailService.sendHtmlEmail(to, email.subject(), email.html(), files);
             }
         } catch (Exception e) {
             log.warn("Failed to queue email '{}' to {}: {}", email.subject(), to, e.getMessage());
         }
-    }
-
-    public void sendSyncWithAttachments(String to, BuiltEmail email, List<MailService.Attachment> extra) {
-        if (to == null || to.isBlank() || email == null) {
-            return;
-        }
-        List<MailService.Attachment> all = new ArrayList<>();
-        if (extra != null) {
-            all.addAll(extra);
-        }
-        mailService.sendHtmlEmail(to, email.subject(), email.html(), all.isEmpty() ? null : all);
-    }
-
-    public void sendAsyncWithAttachments(String to, BuiltEmail email, List<MailService.Attachment> extra) {
-        if (to == null || to.isBlank() || email == null) {
-            return;
-        }
-        List<MailService.Attachment> all = new ArrayList<>();
-        if (extra != null) {
-            all.addAll(extra);
-        }
-        mailService.sendHtmlEmailAsync(to, email.subject(), email.html(), all.isEmpty() ? null : all);
     }
 
     // ── Candidate shortlist ───────────────────────────────────────────────

@@ -301,7 +301,7 @@ public class CandidateService {
 
         Runnable send = () -> {
             try {
-                emailTemplates.sendAsync(to, email, true, "application-update.pdf");
+                emailTemplates.sendCandidateAsync(to, email, true, "application-update.pdf");
             } catch (Exception e) {
                 log.warn("Failed to queue rejection email to {}: {}", to, e.getMessage());
             }

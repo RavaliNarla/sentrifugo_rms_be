@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.server.resource.web.DefaultBearerTokenResolver;
 import org.springframework.security.web.SecurityFilterChain;
 
 /**
@@ -30,7 +31,15 @@ public class SecurityConfig {
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 ->
-                        oauth2.jwt(jwt -> jwt.decoder(jwtDecoder)
+                        oauth2.bearerTokenResolver(request -> {
+                                    String path = request.getRequestURI();
+                                    // These carry an HRMS access token, not an RMS JWT.
+                                    if (path != null && (path.contains("/hrms/access") || path.contains("/hrms/enter"))) {
+                                        return null;
+                                    }
+                                    return new DefaultBearerTokenResolver().resolve(request);
+                                })
+                                .jwt(jwt -> jwt.decoder(jwtDecoder)
                                 .jwtAuthenticationConverter(localJwtAuthentication))
                 );
         return http.build();
