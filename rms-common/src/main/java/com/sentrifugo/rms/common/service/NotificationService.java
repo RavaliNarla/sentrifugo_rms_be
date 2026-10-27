@@ -62,7 +62,21 @@ public class NotificationService {
 
     @Transactional
     public void markAllVisibleAsRead(UUID userId) {
-        notificationRepository.markUnreadAsRead(userId, visibilityCutoff(), IstTime.now());
+        // Entity saves (not bulk JPQL) so field-level audit listeners record readAt changes.
+        LocalDateTime cutoff = visibilityCutoff();
+        LocalDateTime readAt = IstTime.now();
+        List<NotificationEntity> unread = notificationRepository
+                .findByUserIdAndCreatedDateGreaterThanEqualOrderByCreatedDateDesc(userId, cutoff)
+                .stream()
+                .filter(n -> n.getReadAt() == null)
+                .toList();
+        if (unread.isEmpty()) {
+            return;
+        }
+        for (NotificationEntity n : unread) {
+            n.setReadAt(readAt);
+        }
+        notificationRepository.saveAll(unread);
     }
 
     /** Fan-out to every Admin and Recruiter (not committee). Emails go out after commit, async. */

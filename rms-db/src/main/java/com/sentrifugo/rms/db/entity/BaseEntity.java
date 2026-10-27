@@ -26,7 +26,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @SuperBuilder
-@EntityListeners(AuditingEntityListener.class)
+@EntityListeners({AuditingEntityListener.class, com.sentrifugo.rms.db.audit.AuditEntityListener.class})
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public abstract class BaseEntity<ID extends Serializable> {
 

@@ -60,7 +60,8 @@ public class InterviewPanelService {
         rejectIfDuplicateMemberSet(dto.getMemberIds(), id);
         panel.setName(dto.getName());
         interviewPanelRepository.save(panel);
-        interviewPanelMemberRepository.deleteByPanelId(id);
+        // Entity-level delete so audit listeners fire (bulk deleteByPanelId would skip them).
+        interviewPanelMemberRepository.deleteAll(interviewPanelMemberRepository.findByPanelId(id));
         saveMembers(id, dto.getMemberIds());
         return toDto(panel);
     }
@@ -120,7 +121,7 @@ public class InterviewPanelService {
         if (panelHasSchedules(id)) {
             throw new CommonException("Cannot delete a panel that already has interview schedules.");
         }
-        interviewPanelMemberRepository.deleteByPanelId(id);
+        interviewPanelMemberRepository.deleteAll(interviewPanelMemberRepository.findByPanelId(id));
         interviewPanelRepository.deleteById(id);
     }
 
