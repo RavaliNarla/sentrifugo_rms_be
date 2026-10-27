@@ -25,17 +25,55 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
  * Field-level audit writer for {@code hr.audit_events}.
  * One DB row per changed field; shared {@code event_id} per entity mutation;
  * shared {@code correlation_id} per HTTP request / job.
+ *
+ * <p>Only the recruitment / master / user entities listed in {@link #AUDITED_ENTITY_TYPES}
+ * are recorded. Side effects such as Notification rows are skipped.
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuditService implements AuditHook {
+
+    /**
+     * Scoped coverage: users, masters, requisitions/positions, candidates, offers,
+     * interviews, and approval history. Not every BaseEntity.
+     */
+    private static final Set<String> AUDITED_ENTITY_TYPES = Set.of(
+            // Users
+            "User",
+            // Master data
+            "Department",
+            "Location",
+            "PositionTitle",
+            "Certification",
+            "EducationQualification",
+            "Specialization",
+            "ApprovedByRole",
+            "OfferTemplate",
+            "State",
+            // Requisitions / positions
+            "JobRequisition",
+            "JobPosition",
+            // Approvals
+            "RequisitionApprovalHistory",
+            "OfferApprovalHistory",
+            // Candidates / offers
+            "Candidate",
+            "CandidateOffer",
+            // Interviews
+            "InterviewSchedule",
+            "InterviewRoundMeta",
+            "InterviewPanel",
+            "InterviewPanelMember",
+            "PanelMemberScore"
+    );
 
     private final AuditEventRepository auditEventRepository;
     private final UserRepository userRepository;
@@ -74,6 +112,9 @@ public class AuditService implements AuditHook {
         }
 
         String entityType = AuditSnapshot.entityTypeName(entity);
+        if (!AUDITED_ENTITY_TYPES.contains(entityType)) {
+            return;
+        }
         UUID entityId = AuditSnapshot.entityId(entity);
 
         String effectiveAction = action;
