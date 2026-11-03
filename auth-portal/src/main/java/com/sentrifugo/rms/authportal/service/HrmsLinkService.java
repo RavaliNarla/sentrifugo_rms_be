@@ -120,6 +120,7 @@ public class HrmsLinkService {
 
     private JsonNode authMe(String accessToken) {
         String base = iamBase();
+        log.debug("IAM /auth/me → calling {}/auth/me", base);
         try {
             String body = restClient.get()
                     .uri(base + "/auth/me")
@@ -134,6 +135,8 @@ public class HrmsLinkService {
             return root;
         } catch (RestClientResponseException ex) {
             if (ex.getStatusCode().is4xxClientError()) {
+                log.warn("IAM /auth/me → {} {}: {}", base, ex.getStatusCode().value(),
+                        ex.getResponseBodyAsString());
                 throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "HRMS login is not valid.");
             }
             log.warn("IAM /auth/me failed: {}", ex.getStatusCode().value());
