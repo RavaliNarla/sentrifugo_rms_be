@@ -72,6 +72,7 @@ public class OfferService {
     private final SecurityUtils securityUtils;
     private final NotificationService notificationService;
     private final RmsEmailTemplates emailTemplates;
+    private final HrmsOnboardingPushService hrmsOnboardingPushService;
 
     @Value("${app.base.url}")
     private String appBaseUrl;
@@ -438,6 +439,41 @@ public class OfferService {
         return offer.getStatus().name();
     }
 
+    /**
+     * Recruiter-triggered HRMS onboarding for ACCEPTED offers.
+     * Uses the caller's {@code X-Hrms-Authorization} token (same as master sync / genders).
+     * Not {@code @Transactional} — HRMS HTTP must not hold a DB connection.
+     */
+    public int sendToOnboarding(List<UUID> candidateIds, String hrmsAuthorization) {
+        if (hrmsAuthorization == null || hrmsAuthorization.isBlank()) {
+            throw new CommonException("HRMS session is required. Re-enter Recruitment from HRMS and try again.");
+        }
+        if (candidateIds == null || candidateIds.isEmpty()) {
+            throw new CommonException("Select at least one offer-accepted candidate.");
+        }
+        int sent = 0;
+        for (UUID candidateId : candidateIds) {
+            CandidateEntity candidate = candidateRepository.findById(candidateId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Candidate not found"));
+            CandidateOfferEntity offer = candidateOfferRepository.findByCandidateId(candidateId)
+                    .orElseThrow(() -> new CommonException(
+                            "Candidate '" + candidate.getName() + "' has no offer record."));
+            if (offer.getStatus() != OfferStatus.ACCEPTED) {
+                throw new CommonException(
+                        "Candidate '" + candidate.getName() + "' is not in OFFER ACCEPTED status.");
+            }
+            if (offer.getHrmsOnboardingId() != null && !offer.getHrmsOnboardingId().isBlank()) {
+                throw new CommonException(
+                        "Candidate '" + candidate.getName() + "' was already sent to onboarding.");
+            }
+            String onboardingId = hrmsOnboardingPushService.pushOfferAccepted(offer.getId(), hrmsAuthorization);
+            offer.setHrmsOnboardingId(onboardingId);
+            candidateOfferRepository.save(offer);
+            sent++;
+        }
+        return sent;
+    }
+
     private void sendOfferDecisionThankYou(CandidateOfferEntity offer, boolean accept) {
         try {
             CandidateEntity candidate = candidateRepository.findById(offer.getCandidateId()).orElse(null);
@@ -630,6 +666,8 @@ public class OfferService {
                 .offerFileUrl(entity.getOfferFileUrl())
                 .status(entity.getStatus().name())
                 .approvalComments(entity.getApprovalComments())
+                .hrmsOnboardingId(entity.getHrmsOnboardingId())
+                .sentToOnboarding(entity.getHrmsOnboardingId() != null && !entity.getHrmsOnboardingId().isBlank())
                 .build();
     }
 }

@@ -22,10 +22,13 @@ public class LocationController {
 
     private final LocationService locationService;
 
-    @Operation(summary = "Full unpaginated list - used to populate the Add Position Location dropdown")
+    @Operation(summary = "Full unpaginated list - syncs BUs from HRMS when X-Hrms-Authorization is present")
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<LocationDTO>>> getAll(@RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponse.ok(locationService.getAll(search), "Locations fetched successfully"));
+    public ResponseEntity<ApiResponse<List<LocationDTO>>> getAll(
+            @RequestParam(required = false) String search,
+            @RequestHeader(value = "X-Hrms-Authorization", required = false) String hrmsAuthorization) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                locationService.getAll(search, hrmsAuthorization), "Locations fetched successfully"));
     }
 
     @Operation(summary = "Paginated + searchable list - drives the Locations admin screen")
@@ -33,8 +36,10 @@ public class LocationController {
     public ResponseEntity<ApiResponse<Page<LocationDTO>>> search(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(locationService.search(search, page, size), "Locations fetched successfully"));
+            @RequestParam(defaultValue = "10") int size,
+            @RequestHeader(value = "X-Hrms-Authorization", required = false) String hrmsAuthorization) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                locationService.search(search, page, size, hrmsAuthorization), "Locations fetched successfully"));
     }
 
     @PostMapping("/add")

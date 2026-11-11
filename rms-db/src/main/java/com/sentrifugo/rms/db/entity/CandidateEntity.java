@@ -16,6 +16,7 @@ import org.hibernate.annotations.SQLDelete;
 import org.hibernate.annotations.Where;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -35,8 +36,28 @@ public class CandidateEntity extends BaseEntity<UUID> {
     @Column(name = "position_id", nullable = false)
     private UUID positionId;
 
+    /** Display / legacy full name: First + Middle + Last. */
     @Column(name = "name", nullable = false)
     private String name;
+
+    @Column(name = "first_name")
+    private String firstName;
+
+    @Column(name = "middle_name")
+    private String middleName;
+
+    @Column(name = "last_name")
+    private String lastName;
+
+    /** HRMS master-data GENDERS id (no local gender master). */
+    @Column(name = "gender_hrms_id")
+    private String genderHrmsId;
+
+    @Column(name = "gender_name")
+    private String genderName;
+
+    @Column(name = "date_of_birth")
+    private LocalDate dateOfBirth;
 
     @Column(name = "phone", nullable = false)
     private String phone;

@@ -103,6 +103,7 @@ public class JobPositionService {
         entity.setDepartmentId(dto.getDepartmentId());
         entity.setLocationId(dto.getLocationId());
         entity.setPositionTitleId(dto.getPositionTitleId());
+        applyMasterSnapshots(entity, dto.getDepartmentId(), dto.getLocationId(), dto.getPositionTitleId());
         entity.setJobDescription(dto.getJobDescription());
         entity.setRolesResponsibilities(dto.getRolesResponsibilities());
         entity.setEducationQualificationId(dto.getEducationQualificationId());
@@ -117,6 +118,28 @@ public class JobPositionService {
         entity.setApprovedById(dto.getApprovedById());
         entity.setApprovedByOtherText(dto.getApprovedByOtherText());
         entity.setApprovedOn(dto.getApprovedOn());
+    }
+
+    private void applyMasterSnapshots(
+            JobPositionEntity entity, UUID departmentId, UUID locationId, UUID positionTitleId) {
+        if (departmentId != null) {
+            departmentRepository.findById(departmentId).ifPresent(dept -> {
+                entity.setDepartmentHrmsId(dept.getHrmsId());
+                entity.setDepartmentName(dept.getName());
+            });
+        }
+        if (locationId != null) {
+            locationRepository.findById(locationId).ifPresent(loc -> {
+                entity.setLocationHrmsId(loc.getHrmsId());
+                entity.setLocationName(loc.getName());
+            });
+        }
+        if (positionTitleId != null) {
+            positionTitleRepository.findById(positionTitleId).ifPresent(title -> {
+                entity.setPositionTitleHrmsId(title.getHrmsId());
+                entity.setPositionTitleName(title.getName());
+            });
+        }
     }
 
     /**
@@ -216,15 +239,22 @@ public class JobPositionService {
         Map<UUID, String> approvedByRoles = approvedByRoleRepository.findAll().stream()
                 .collect(Collectors.toMap(ApprovedByRoleEntity::getId, ApprovedByRoleEntity::getName));
 
+        String departmentName = entity.getDepartmentName() != null
+                ? entity.getDepartmentName() : departments.get(entity.getDepartmentId());
+        String locationName = entity.getLocationName() != null
+                ? entity.getLocationName() : locations.get(entity.getLocationId());
+        String positionTitleName = entity.getPositionTitleName() != null
+                ? entity.getPositionTitleName() : positionTitles.get(entity.getPositionTitleId());
+
         return JobPositionDTO.builder()
                 .id(entity.getId())
                 .requisitionId(entity.getRequisitionId())
                 .departmentId(entity.getDepartmentId())
-                .departmentName(departments.get(entity.getDepartmentId()))
+                .departmentName(departmentName)
                 .locationId(entity.getLocationId())
-                .locationName(locations.get(entity.getLocationId()))
+                .locationName(locationName)
                 .positionTitleId(entity.getPositionTitleId())
-                .positionTitleName(positionTitles.get(entity.getPositionTitleId()))
+                .positionTitleName(positionTitleName)
                 .jobDescription(entity.getJobDescription())
                 .rolesResponsibilities(entity.getRolesResponsibilities())
                 .educationQualificationId(entity.getEducationQualificationId())

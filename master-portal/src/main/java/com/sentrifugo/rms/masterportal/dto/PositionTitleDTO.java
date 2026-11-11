@@ -1,7 +1,6 @@
 package com.sentrifugo.rms.masterportal.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -10,9 +9,7 @@ import lombok.NoArgsConstructor;
 import java.util.UUID;
 
 /**
- * Position Master DTO - richer than the plain id+name NamedMasterDTO. Carries the
- * department link (drives the department-filtered dropdown on Add Position) and
- * the prefill fields (Job Description, Minimum Experience).
+ * Position Master DTO. Department link and experience / R&R are RMS-only and optional.
  */
 @Data
 @Builder
@@ -24,7 +21,7 @@ public class PositionTitleDTO {
     @NotBlank(message = "Name is required")
     private String name;
 
-    @NotNull(message = "Department is required")
+    /** Null = None (unlinked; appears under every department on Add Position). */
     private UUID departmentId;
     private String departmentName;
 

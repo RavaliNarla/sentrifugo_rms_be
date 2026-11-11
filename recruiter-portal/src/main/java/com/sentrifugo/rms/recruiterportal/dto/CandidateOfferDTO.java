@@ -23,4 +23,7 @@ public class CandidateOfferDTO {
     private String offerFileUrl;
     private String status;
     private String approvalComments;
+    /** Set after successful Send to Onboarding; used to hide/disable re-send. */
+    private String hrmsOnboardingId;
+    private boolean sentToOnboarding;
 }

@@ -101,12 +101,10 @@ public class MasterDataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        seedDepartments();
-        seedLocations();
+        // Departments, locations, and position titles come from HRMS sync — do not seed them.
         seedApprovedByRoles();
         seedSpecializations();
         seedCertifications();
-        seedPositionTitles();
     }
 
     private void seedDepartments() {

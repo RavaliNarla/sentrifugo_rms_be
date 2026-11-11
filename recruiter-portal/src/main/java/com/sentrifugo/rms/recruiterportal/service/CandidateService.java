@@ -74,15 +74,16 @@ public class CandidateService {
     }
 
     /**
-     * requireResume is false for bulk (Excel) import, which only collects Name/Phone/Email -
-     * the single Add Candidate form (requireResume=true) is the only place a resume is mandatory.
+     * requireResume is false for bulk (Excel) import, which only collects name parts/Phone/Email -
+     * the single Add Candidate form (requireResume=true) is the only place a resume (and gender) is mandatory.
      */
     @Transactional
     public CandidateDTO add(CandidateDTO dto, MultipartFile resume, MultipartFile idProof, MultipartFile photo, boolean requireResume) {
         JobPositionEntity position = jobPositionRepository.findById(dto.getPositionId())
                 .orElseThrow(() -> new ResourceNotFoundException("Position not found"));
 
-        validateContactFields(dto);
+        normalizeNameParts(dto);
+        validateContactFields(dto, requireResume);
         if (resume != null && resume.isEmpty() && resume.getOriginalFilename() != null && !resume.getOriginalFilename().isBlank()) {
             throw new CommonException("The uploaded resume file is empty (0 bytes). Please choose a resume with content.");
         }
@@ -103,7 +104,13 @@ public class CandidateService {
         CandidateEntity entity = CandidateEntity.builder()
                 .requisitionId(position.getRequisitionId())
                 .positionId(position.getId())
+                .firstName(dto.getFirstName())
+                .middleName(trimToNull(dto.getMiddleName()))
+                .lastName(dto.getLastName())
                 .name(dto.getName())
+                .genderHrmsId(trimToNull(dto.getGenderHrmsId()))
+                .genderName(trimToNull(dto.getGenderName()))
+                .dateOfBirth(dto.getDateOfBirth())
                 .phone(dto.getPhone())
                 .email(dto.getEmail())
                 .status((resume != null && !resume.isEmpty()) ? CandidateStatus.ADDED : CandidateStatus.RESUME_PENDING)
@@ -130,7 +137,8 @@ public class CandidateService {
         if (!EDITABLE_STATUSES.contains(entity.getStatus())) {
             throw new CommonException("Only newly-added candidates can be edited.");
         }
-        validateContactFields(dto);
+        normalizeNameParts(dto);
+        validateContactFields(dto, true);
         if (resume != null && resume.isEmpty() && resume.getOriginalFilename() != null && !resume.getOriginalFilename().isBlank()) {
             throw new CommonException("The uploaded resume file is empty (0 bytes). Please choose a resume with content.");
         }
@@ -149,7 +157,13 @@ public class CandidateService {
             throw new CommonException(String.join(" ", contactConflicts));
         }
 
+        entity.setFirstName(dto.getFirstName());
+        entity.setMiddleName(trimToNull(dto.getMiddleName()));
+        entity.setLastName(dto.getLastName());
         entity.setName(dto.getName());
+        entity.setGenderHrmsId(trimToNull(dto.getGenderHrmsId()));
+        entity.setGenderName(trimToNull(dto.getGenderName()));
+        entity.setDateOfBirth(dto.getDateOfBirth());
         entity.setPhone(dto.getPhone());
         entity.setEmail(dto.getEmail());
         if (resume != null && !resume.isEmpty()) {
@@ -209,9 +223,19 @@ public class CandidateService {
         return toDto(candidateRepository.save(entity));
     }
 
-    private void validateContactFields(CandidateDTO dto) {
+    private void validateContactFields(CandidateDTO dto, boolean requireGender) {
+        if (dto.getFirstName() == null || dto.getFirstName().isBlank()) {
+            throw new CommonException("First name is required.");
+        }
+        if (dto.getLastName() == null || dto.getLastName().isBlank()) {
+            throw new CommonException("Last name is required.");
+        }
         if (dto.getName() == null || dto.getName().isBlank()) {
             throw new CommonException("Name is required.");
+        }
+        if (requireGender && (dto.getGenderHrmsId() == null || dto.getGenderHrmsId().isBlank()
+                || dto.getGenderName() == null || dto.getGenderName().isBlank())) {
+            throw new CommonException("Gender is required.");
         }
         if (dto.getEmail() == null || !EMAIL_PATTERN.matcher(dto.getEmail()).matches()) {
             throw new CommonException("Please enter a valid email address.");
@@ -219,6 +243,46 @@ public class CandidateService {
         if (dto.getPhone() == null || !PHONE_PATTERN.matcher(dto.getPhone()).matches()) {
             throw new CommonException("Please enter a valid 10-digit phone number.");
         }
+    }
+
+    /** Builds {@code name} from first / middle / last (space-separated, skipping blanks). */
+    static void normalizeNameParts(CandidateDTO dto) {
+        String first = trimToEmpty(dto.getFirstName());
+        String middle = trimToEmpty(dto.getMiddleName());
+        String last = trimToEmpty(dto.getLastName());
+        dto.setFirstName(first.isEmpty() ? null : first);
+        dto.setMiddleName(middle.isEmpty() ? null : middle);
+        dto.setLastName(last.isEmpty() ? null : last);
+        dto.setName(buildFullName(first, middle, last));
+    }
+
+    static String buildFullName(String first, String middle, String last) {
+        StringBuilder sb = new StringBuilder();
+        appendNamePart(sb, first);
+        appendNamePart(sb, middle);
+        appendNamePart(sb, last);
+        return sb.toString();
+    }
+
+    private static void appendNamePart(StringBuilder sb, String part) {
+        if (part == null || part.isBlank()) {
+            return;
+        }
+        if (sb.length() > 0) {
+            sb.append(' ');
+        }
+        sb.append(part.trim());
+    }
+
+    private static String trimToEmpty(String value) {
+        return value == null ? "" : value.trim();
+    }
+
+    private static String trimToNull(String value) {
+        if (value == null || value.isBlank()) {
+            return null;
+        }
+        return value.trim();
     }
 
     public Page<CandidateDTO> search(UUID positionId, List<CandidateStatus> statuses, String searchText, int page, int size) {
@@ -346,6 +410,12 @@ public class CandidateService {
                 .positionId(entity.getPositionId())
                 .positionTitleName(positionTitleName)
                 .name(entity.getName())
+                .firstName(entity.getFirstName())
+                .middleName(entity.getMiddleName())
+                .lastName(entity.getLastName())
+                .genderHrmsId(entity.getGenderHrmsId())
+                .genderName(entity.getGenderName())
+                .dateOfBirth(entity.getDateOfBirth())
                 .phone(entity.getPhone())
                 .email(entity.getEmail())
                 .resumeUrl(entity.getResumeUrl())

@@ -3,7 +3,6 @@ package com.sentrifugo.rms.db.entity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
@@ -15,13 +14,11 @@ import org.hibernate.annotations.Where;
 import java.util.UUID;
 
 /**
- * Position Master (Section 5 of the requirements doc): pre-defines positions per
- * department so the Add Position screen can auto-populate the Positions dropdown
- * from the selected Department, and prefill Job Description / Minimum Experience.
+ * Position / designation master. HRMS designations sync here without a department link;
+ * {@code departmentId}, {@code jobDescription}, and {@code minimumExperienceYears} are RMS-only.
  */
 @Entity
-@Table(name = "position_titles", schema = "common",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"name", "department_id"}))
+@Table(name = "position_titles", schema = "common")
 @Data
 @SuperBuilder
 @NoArgsConstructor
@@ -31,15 +28,22 @@ import java.util.UUID;
 @Where(clause = "is_active = true")
 public class PositionTitleEntity extends BaseEntity<UUID> {
 
+    /** IAM designation id — sync key. */
+    @Column(name = "hrms_id", unique = true)
+    private String hrmsId;
+
     @Column(name = "name", nullable = false)
     private String name;
 
+    /** RMS-only optional link; null = appears under every department on Add Position. */
     @Column(name = "department_id")
     private UUID departmentId;
 
+    /** RMS-only Roles & Responsibilities default. */
     @Column(name = "job_description", columnDefinition = "TEXT")
     private String jobDescription;
 
+    /** RMS-only minimum experience default (null = None). */
     @Column(name = "minimum_experience_years")
     private Integer minimumExperienceYears;
 }

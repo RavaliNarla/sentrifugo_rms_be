@@ -15,6 +15,8 @@ public class AppConstants {
             "/api/v1/auth/reset-password",
             "/api/v1/auth/hrms/access",
             "/api/v1/auth/hrms/enter",
+            "/api/v1/auth/hrms/rms-admins",
+            "/api/v1/auth/hrms/rms-admins/**",
             "/actuator/health"
     };
 

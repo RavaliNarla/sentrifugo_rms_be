@@ -20,6 +20,15 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     @Query(value = "SELECT * FROM hr.users WHERE LOWER(email) = LOWER(:email) LIMIT 1", nativeQuery = true)
     Optional<UserEntity> findIncludingInactiveByEmailIgnoreCase(@Param("email") String email);
 
+    @Query(value = "SELECT * FROM hr.users WHERE id = :id LIMIT 1", nativeQuery = true)
+    Optional<UserEntity> findIncludingInactiveById(@Param("id") UUID id);
+
+    @Query(value = "SELECT * FROM hr.users WHERE LOWER(employee_id) = LOWER(:employeeId) LIMIT 1", nativeQuery = true)
+    Optional<UserEntity> findIncludingInactiveByEmployeeIdIgnoreCase(@Param("employeeId") String employeeId);
+
+    @Query(value = "SELECT * FROM hr.users WHERE LOWER(role) = 'admin' ORDER BY name ASC", nativeQuery = true)
+    List<UserEntity> findAdminsIncludingInactive();
+
     Optional<UserEntity> findByEmployeeIdIgnoreCase(String employeeId);
 
     @Query("""

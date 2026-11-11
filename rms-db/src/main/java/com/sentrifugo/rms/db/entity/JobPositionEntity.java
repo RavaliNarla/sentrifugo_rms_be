@@ -36,11 +36,29 @@ public class JobPositionEntity extends BaseEntity<UUID> {
     @Column(name = "department_id", nullable = false)
     private UUID departmentId;
 
+    @Column(name = "department_hrms_id")
+    private String departmentHrmsId;
+
+    @Column(name = "department_name")
+    private String departmentName;
+
     @Column(name = "location_id", nullable = false)
     private UUID locationId;
 
+    @Column(name = "location_hrms_id")
+    private String locationHrmsId;
+
+    @Column(name = "location_name")
+    private String locationName;
+
     @Column(name = "position_title_id", nullable = false)
     private UUID positionTitleId;
+
+    @Column(name = "position_title_hrms_id")
+    private String positionTitleHrmsId;
+
+    @Column(name = "position_title_name")
+    private String positionTitleName;
 
     @Column(name = "job_description", columnDefinition = "TEXT")
     private String jobDescription;

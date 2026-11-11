@@ -71,13 +71,78 @@ public class SchemaConstraintFixer implements CommandLineRunner {
         }
 
         ensureMasterCodes();
+        ensureHrmsMasterColumns();
     }
 
-    /** Add unique 3-char codes on departments/locations and backfill existing rows. */
+    /** HRMS sync columns + relax old constraints that conflict with unlinked designations. */
+    private void ensureHrmsMasterColumns() {
+        try {
+            jdbcTemplate.execute("ALTER TABLE common.departments ADD COLUMN IF NOT EXISTS hrms_id varchar(64)");
+            jdbcTemplate.execute("ALTER TABLE common.locations ADD COLUMN IF NOT EXISTS hrms_id varchar(64)");
+            jdbcTemplate.execute("ALTER TABLE common.position_titles ADD COLUMN IF NOT EXISTS hrms_id varchar(64)");
+            jdbcTemplate.execute("ALTER TABLE common.departments ADD COLUMN IF NOT EXISTS hrms_business_unit_ids text");
+            jdbcTemplate.execute("ALTER TABLE common.departments ALTER COLUMN code TYPE varchar(64)");
+            jdbcTemplate.execute("ALTER TABLE common.locations ALTER COLUMN code TYPE varchar(64)");
+            jdbcTemplate.execute("ALTER TABLE common.locations ALTER COLUMN state_id DROP NOT NULL");
+            jdbcTemplate.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_departments_hrms_id
+                    ON common.departments (hrms_id) WHERE hrms_id IS NOT NULL
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_locations_hrms_id
+                    ON common.locations (hrms_id) WHERE hrms_id IS NOT NULL
+                    """);
+            jdbcTemplate.execute("""
+                    CREATE UNIQUE INDEX IF NOT EXISTS uq_position_titles_hrms_id
+                    ON common.position_titles (hrms_id) WHERE hrms_id IS NOT NULL
+                    """);
+            // Old uniqueness was (name, department_id); designations are global and may share names across links.
+            jdbcTemplate.execute("""
+                    DO $$
+                    DECLARE r record;
+                    BEGIN
+                      FOR r IN
+                        SELECT c.conname
+                        FROM pg_constraint c
+                        JOIN pg_class t ON c.conrelid = t.oid
+                        JOIN pg_namespace n ON t.relnamespace = n.oid
+                        WHERE n.nspname = 'common' AND t.relname = 'position_titles'
+                          AND c.contype = 'u'
+                          AND pg_get_constraintdef(c.oid) ILIKE '%department_id%'
+                      LOOP
+                        EXECUTE 'ALTER TABLE common.position_titles DROP CONSTRAINT IF EXISTS ' || quote_ident(r.conname);
+                      END LOOP;
+                    END $$;
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE recruitment.job_requisitions
+                      ADD COLUMN IF NOT EXISTS department_hrms_id varchar(64),
+                      ADD COLUMN IF NOT EXISTS department_name varchar(255),
+                      ADD COLUMN IF NOT EXISTS location_hrms_id varchar(64),
+                      ADD COLUMN IF NOT EXISTS location_name varchar(255)
+                    """);
+            jdbcTemplate.execute("""
+                    ALTER TABLE recruitment.job_positions
+                      ADD COLUMN IF NOT EXISTS department_hrms_id varchar(64),
+                      ADD COLUMN IF NOT EXISTS department_name varchar(255),
+                      ADD COLUMN IF NOT EXISTS location_hrms_id varchar(64),
+                      ADD COLUMN IF NOT EXISTS location_name varchar(255),
+                      ADD COLUMN IF NOT EXISTS position_title_hrms_id varchar(64),
+                      ADD COLUMN IF NOT EXISTS position_title_name varchar(255)
+                    """);
+            log.info("Ensured HRMS master sync columns and relaxed position_titles uniqueness");
+        } catch (Exception e) {
+            log.warn("Could not ensure HRMS master columns: {}", e.getMessage());
+        }
+    }
+
+    /** Ensure department/location code columns exist (variable length from HRMS) and backfill blanks. */
     private void ensureMasterCodes() {
         try {
-            jdbcTemplate.execute("ALTER TABLE common.departments ADD COLUMN IF NOT EXISTS code varchar(3)");
-            jdbcTemplate.execute("ALTER TABLE common.locations ADD COLUMN IF NOT EXISTS code varchar(3)");
+            jdbcTemplate.execute("ALTER TABLE common.departments ADD COLUMN IF NOT EXISTS code varchar(64)");
+            jdbcTemplate.execute("ALTER TABLE common.locations ADD COLUMN IF NOT EXISTS code varchar(64)");
+            jdbcTemplate.execute("ALTER TABLE common.departments ALTER COLUMN code TYPE varchar(64)");
+            jdbcTemplate.execute("ALTER TABLE common.locations ALTER COLUMN code TYPE varchar(64)");
         } catch (Exception e) {
             log.warn("Could not add master code columns: {}", e.getMessage());
             return;

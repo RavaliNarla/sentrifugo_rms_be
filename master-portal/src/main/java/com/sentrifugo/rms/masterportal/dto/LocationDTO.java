@@ -1,7 +1,6 @@
 package com.sentrifugo.rms.masterportal.dto;
 
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,13 +15,16 @@ import java.util.UUID;
 public class LocationDTO {
     private UUID id;
 
+    /** HRMS business-unit id (sync key). */
+    private String hrmsId;
+
     @NotBlank(message = "Location name is required")
     private String name;
 
     @NotBlank(message = "Code is required")
     private String code;
 
-    @NotNull(message = "State is required")
+    /** Optional — kept for compatibility; not shown in Admin UI. */
     private UUID stateId;
 
     private String stateName;

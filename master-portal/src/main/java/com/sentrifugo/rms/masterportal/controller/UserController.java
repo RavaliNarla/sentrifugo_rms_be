@@ -45,10 +45,12 @@ public class UserController {
         return ResponseEntity.ok(ApiResponse.ok(userService.update(id, dto), "User updated successfully"));
     }
 
-    @Operation(summary = "Delete (deactivate) a user")
+    @Operation(summary = "Delete (deactivate) a user. Pass replacementUserId when the user is an L1/L2 Approver.")
     @DeleteMapping("/delete/{id}")
-    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable UUID id) {
-        userService.delete(id);
+    public ResponseEntity<ApiResponse<Void>> delete(
+            @PathVariable UUID id,
+            @RequestParam(required = false) UUID replacementUserId) {
+        userService.delete(id, replacementUserId);
         return ResponseEntity.ok(ApiResponse.ok("User deleted successfully"));
     }
 }

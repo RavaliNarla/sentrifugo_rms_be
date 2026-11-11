@@ -6,15 +6,18 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
 import java.util.UUID;
 
-/** Department master: name, unique 3-char code, optional description. */
+/** Department master: name, HRMS code (as-is), optional description, linked BU ids. */
 @Data
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 public class DepartmentDTO {
     private UUID id;
+
+    private String hrmsId;
 
     @NotBlank(message = "Name is required")
     private String name;
@@ -23,4 +26,7 @@ public class DepartmentDTO {
     private String code;
 
     private String description;
+
+    /** HRMS business-unit ids this department belongs to (for location filtering). */
+    private List<String> businessUnitHrmsIds;
 }

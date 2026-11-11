@@ -10,6 +10,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
@@ -26,8 +27,21 @@ public class CandidateDTO {
     private UUID positionId;
     private String positionTitleName;
 
-    @NotBlank(message = "Name is required")
+    /** Constructed full name (First Middle Last). Kept for list/display compatibility. */
     private String name;
+
+    @NotBlank(message = "First name is required")
+    private String firstName;
+
+    private String middleName;
+
+    @NotBlank(message = "Last name is required")
+    private String lastName;
+
+    private String genderHrmsId;
+    private String genderName;
+
+    private LocalDate dateOfBirth;
 
     @NotBlank(message = "Phone is required")
     @Pattern(regexp = "^[0-9]{10}$", message = "Phone must be a valid 10-digit number")

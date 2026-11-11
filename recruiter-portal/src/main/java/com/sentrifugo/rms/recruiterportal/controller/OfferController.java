@@ -72,6 +72,17 @@ public class OfferController {
         return ResponseEntity.ok(ApiResponse.ok(offerService.getByCandidateId(candidateId), "Offer fetched successfully"));
     }
 
+    @Operation(summary = "Send ACCEPTED offer candidate(s) to HRMS onboarding (resume upload + create). Requires X-Hrms-Authorization.")
+    @PostMapping("/send-to-onboarding")
+    public ResponseEntity<ApiResponse<Integer>> sendToOnboarding(
+            @RequestBody List<UUID> candidateIds,
+            @RequestHeader(value = "X-Hrms-Authorization", required = false) String hrmsAuthorization) {
+        int sent = offerService.sendToOnboarding(candidateIds, hrmsAuthorization);
+        return ResponseEntity.ok(ApiResponse.ok(sent,
+                sent == 1 ? "Candidate sent to onboarding successfully"
+                        : sent + " candidates sent to onboarding successfully"));
+    }
+
     @Operation(summary = "Approval history for an offer (for the Offer Approvals history modal)")
     @GetMapping("/{id}/approval-history")
     public ResponseEntity<ApiResponse<List<OfferApprovalHistoryDTO>>> getApprovalHistory(@PathVariable UUID id) {

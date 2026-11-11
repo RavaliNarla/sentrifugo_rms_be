@@ -5,9 +5,11 @@ import com.sentrifugo.rms.common.dto.ApiResponse;
 import com.sentrifugo.rms.db.enums.CandidateStatus;
 import com.sentrifugo.rms.recruiterportal.dto.CandidateBulkImportResult;
 import com.sentrifugo.rms.recruiterportal.dto.CandidateDTO;
+import com.sentrifugo.rms.recruiterportal.dto.HrmsGenderOption;
 import com.sentrifugo.rms.recruiterportal.dto.ShortlistDecisionRequest;
 import com.sentrifugo.rms.recruiterportal.service.CandidateBulkImportService;
 import com.sentrifugo.rms.recruiterportal.service.CandidateService;
+import com.sentrifugo.rms.recruiterportal.service.HrmsMasterDataClient;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -30,7 +32,17 @@ public class CandidateController {
 
     private final CandidateService candidateService;
     private final CandidateBulkImportService candidateBulkImportService;
+    private final HrmsMasterDataClient hrmsMasterDataClient;
     private final ObjectMapper objectMapper;
+
+    @Operation(summary = "List genders from HRMS master-data (no local RMS copy). Pass X-Hrms-Authorization Bearer token.")
+    @GetMapping("/genders")
+    public ResponseEntity<ApiResponse<List<HrmsGenderOption>>> genders(
+            @RequestHeader(value = "X-Hrms-Authorization", required = false) String hrmsAuthorization) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                hrmsMasterDataClient.listGenders(hrmsAuthorization),
+                "Genders fetched successfully"));
+    }
 
     @Operation(summary = "Add a candidate manually to a position's Candidate Pool (multipart: 'candidate' JSON + optional 'resume' + optional 'idProof' + optional 'photo')")
     @PostMapping(value = "/add", consumes = "multipart/form-data")
@@ -108,7 +120,7 @@ public class CandidateController {
         return ResponseEntity.ok(ApiResponse.ok("Decision recorded successfully"));
     }
 
-    @Operation(summary = "Download XLSX template for bulk candidate import (Name, Phone, Email)")
+    @Operation(summary = "Download XLSX template for bulk candidate import (First/Middle/Last Name, Phone, Email)")
     @GetMapping("/bulk-template")
     public ResponseEntity<byte[]> downloadBulkTemplate() {
         byte[] bytes = candidateBulkImportService.buildTemplate();
@@ -118,7 +130,7 @@ public class CandidateController {
                 .body(bytes);
     }
 
-    @Operation(summary = "Bulk-add candidates for a position from an XLSX file (Name, Phone, Email columns)")
+    @Operation(summary = "Bulk-add candidates for a position from an XLSX file (First/Middle/Last Name, Phone, Email)")
     @PostMapping(value = "/bulk-import", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ApiResponse<CandidateBulkImportResult>> bulkImport(
             @RequestParam UUID positionId,

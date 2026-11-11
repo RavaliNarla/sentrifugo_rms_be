@@ -29,14 +29,14 @@ import java.util.Locale;
 import java.util.UUID;
 
 /**
- * Bulk candidate import via XLSX (Name / Phone / Email only — no resume/photo/ID proof).
+ * Bulk candidate import via XLSX (First/Middle/Last Name + Phone/Email — no resume/photo/ID proof).
  */
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CandidateBulkImportService {
 
-    private static final String[] HEADERS = {"Name", "Phone", "Email"};
+    private static final String[] HEADERS = {"First Name", "Middle Name", "Last Name", "Phone", "Email"};
     private static final int MAX_DATA_ROWS = 500;
     private static final DataFormatter FORMATTER = new DataFormatter();
 
@@ -52,13 +52,12 @@ public class CandidateBulkImportService {
                 sheet.setColumnWidth(i, 22 * 256);
             }
 
-            // Soft Excel validations for data rows (server still validates on import).
             DataValidationHelper helper = sheet.getDataValidationHelper();
-            addTextLengthValidation(helper, sheet, 0, 1, 200, "Enter candidate full name (1-200 characters).");
-            addTextLengthValidation(helper, sheet, 1, 10, 10, "Enter a 10-digit phone number (digits only).");
-            addTextLengthValidation(helper, sheet, 2, 5, 200, "Enter a valid email address.");
+            addTextLengthValidation(helper, sheet, 0, 1, 100, "Enter first name (required).");
+            addTextLengthValidation(helper, sheet, 2, 1, 100, "Enter last name (required).");
+            addTextLengthValidation(helper, sheet, 3, 10, 10, "Enter a 10-digit phone number (digits only).");
+            addTextLengthValidation(helper, sheet, 4, 5, 200, "Enter a valid email address.");
 
-            // Sample blank rows so users see the editable area.
             for (int r = 1; r <= 10; r++) {
                 sheet.createRow(r);
             }
@@ -94,7 +93,8 @@ public class CandidateBulkImportService {
 
             Row headerRow = sheet.getRow(0);
             if (headerRow == null || !headersMatch(headerRow)) {
-                throw new CommonException("Invalid template. Expected columns: Name, Phone, Email (in that order). Download the template and try again.");
+                throw new CommonException(
+                        "Invalid template. Expected columns: First Name, Middle Name, Last Name, Phone, Email. Download the template and try again.");
             }
 
             int lastRow = Math.min(sheet.getLastRowNum(), MAX_DATA_ROWS);
@@ -105,18 +105,19 @@ public class CandidateBulkImportService {
                     continue;
                 }
                 anyData = true;
-                String name = cellText(row.getCell(0)).trim();
-                String phone = normalizePhone(cellText(row.getCell(1)));
-                String email = cellText(row.getCell(2)).trim();
+                String firstName = cellText(row.getCell(0)).trim();
+                String middleName = cellText(row.getCell(1)).trim();
+                String lastName = cellText(row.getCell(2)).trim();
+                String phone = normalizePhone(cellText(row.getCell(3)));
+                String email = cellText(row.getCell(4)).trim();
 
                 try {
-                    if (name.isBlank()) {
-                        throw new CommonException("Name is required");
-                    }
                     CandidateDTO dto = CandidateDTO.builder()
                             .requisitionId(position.getRequisitionId())
                             .positionId(position.getId())
-                            .name(name)
+                            .firstName(firstName)
+                            .middleName(middleName.isBlank() ? null : middleName)
+                            .lastName(lastName)
                             .phone(phone)
                             .email(email)
                             .build();
@@ -180,13 +181,7 @@ public class CandidateBulkImportService {
         if (raw == null) {
             return "";
         }
-        // Excel may format long numbers with decimals/spaces; keep digits only.
-        String digits = raw.replaceAll("[^0-9]", "");
-        // Handle values like 9876543210.0 from numeric cells already formatted.
-        if (digits.length() > 10 && digits.endsWith("0") && raw.contains(".")) {
-            // Already handled by formatter usually; leave as digits.
-        }
-        return digits;
+        return raw.replaceAll("[^0-9]", "");
     }
 
     private static void addTextLengthValidation(DataValidationHelper helper, Sheet sheet,

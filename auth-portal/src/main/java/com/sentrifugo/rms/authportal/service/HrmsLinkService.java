@@ -96,6 +96,11 @@ public class HrmsLinkService {
                 .build();
     }
 
+    /** Validates the HRMS Bearer token with IAM (no RMS user match required). */
+    public void requireValidSession(String authorization) {
+        authMe(bearer(authorization));
+    }
+
     /** One employee-list search. Caller must already be an RMS admin (enforced on the controller). */
     public JsonNode searchEmployees(String hrmsToken, String search) {
         String query = search == null ? "" : search.trim();

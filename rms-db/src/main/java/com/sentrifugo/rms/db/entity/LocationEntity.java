@@ -24,14 +24,19 @@ import java.util.UUID;
 @Where(clause = "is_active = true")
 public class LocationEntity extends BaseEntity<UUID> {
 
+    /** IAM business-unit id — sync key (plant/office = BU). */
+    @Column(name = "hrms_id", unique = true)
+    private String hrmsId;
+
     @Column(name = "name", nullable = false)
     private String name;
 
-    /** 3-char code used in requisition numbers (e.g. HYD for Hyderabad). */
-    @Column(name = "code", length = 3, unique = true)
+    /** Code from HRMS emp_code_prefix (as-is); used in requisition numbers. */
+    @Column(name = "code", length = 64, unique = true)
     private String code;
 
-    @Column(name = "state_id", nullable = false)
+    /** Optional — HRMS BUs do not always map to RMS states. */
+    @Column(name = "state_id")
     private UUID stateId;
 
     @Column(name = "address", columnDefinition = "TEXT")

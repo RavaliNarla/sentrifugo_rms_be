@@ -22,19 +22,24 @@ public class PositionTitleController {
 
     private final PositionTitleService service;
 
-    @Operation(summary = "Paginated + searchable list - drives the Position Titles admin screen")
+    @Operation(summary = "Paginated list - syncs designations from HRMS when X-Hrms-Authorization is present")
     @GetMapping("/all")
     public ResponseEntity<ApiResponse<Page<PositionTitleDTO>>> getAll(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(service.getAll(search, page, size), "Position titles fetched successfully"));
+            @RequestParam(defaultValue = "10") int size,
+            @RequestHeader(value = "X-Hrms-Authorization", required = false) String hrmsAuthorization) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                service.getAll(search, page, size, hrmsAuthorization), "Position titles fetched successfully"));
     }
 
-    @Operation(summary = "Position titles under a department - drives the Add Position screen's department-filtered dropdown")
+    @Operation(summary = "Titles for a department including unlinked (department None) titles")
     @GetMapping("/by-department/{departmentId}")
-    public ResponseEntity<ApiResponse<List<PositionTitleDTO>>> getByDepartment(@PathVariable UUID departmentId) {
-        return ResponseEntity.ok(ApiResponse.ok(service.getByDepartment(departmentId), "Position titles fetched successfully"));
+    public ResponseEntity<ApiResponse<List<PositionTitleDTO>>> getByDepartment(
+            @PathVariable UUID departmentId,
+            @RequestHeader(value = "X-Hrms-Authorization", required = false) String hrmsAuthorization) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                service.getByDepartment(departmentId, hrmsAuthorization), "Position titles fetched successfully"));
     }
 
     @PostMapping("/add")

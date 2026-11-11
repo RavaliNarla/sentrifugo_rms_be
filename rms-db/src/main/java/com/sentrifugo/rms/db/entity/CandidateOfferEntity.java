@@ -65,4 +65,8 @@ public class CandidateOfferEntity extends BaseEntity<UUID> {
 
     @Column(name = "decided_date")
     private LocalDateTime decidedDate;
+
+    /** HRMS onboarding record id after recruiter "Send to Onboarding". */
+    @Column(name = "hrms_onboarding_id")
+    private String hrmsOnboardingId;
 }

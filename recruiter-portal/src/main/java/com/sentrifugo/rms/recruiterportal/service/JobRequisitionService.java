@@ -83,9 +83,33 @@ public class JobRequisitionService {
                 .locationId(locationId)
                 .status(RequisitionStatus.NEW)
                 .build();
+        applyMasterSnapshots(entity, departmentId, locationId);
         entity.setRequisitionCode(generateRequisitionCode(deptCode, locCode));
         JobRequisitionEntity saved = jobRequisitionRepository.save(entity);
         return toDto(saved);
+    }
+
+    private void applyMasterSnapshots(JobRequisitionEntity entity, UUID departmentId, UUID locationId) {
+        if (departmentId != null) {
+            DepartmentEntity dept = departmentRepository.findById(departmentId).orElse(null);
+            if (dept != null) {
+                entity.setDepartmentHrmsId(dept.getHrmsId());
+                entity.setDepartmentName(dept.getName());
+            }
+        } else {
+            entity.setDepartmentHrmsId(null);
+            entity.setDepartmentName(null);
+        }
+        if (locationId != null) {
+            LocationEntity loc = locationRepository.findById(locationId).orElse(null);
+            if (loc != null) {
+                entity.setLocationHrmsId(loc.getHrmsId());
+                entity.setLocationName(loc.getName());
+            }
+        } else {
+            entity.setLocationHrmsId(null);
+            entity.setLocationName(null);
+        }
     }
 
     public JobRequisitionDTO update(UUID id, JobRequisitionDTO dto) {
@@ -467,7 +491,7 @@ public class JobRequisitionService {
         DepartmentEntity dept = departmentRepository.findById(departmentId)
                 .orElseThrow(() -> new CommonException("Selected department was not found."));
         if (dept.getCode() == null || dept.getCode().isBlank()) {
-            throw new CommonException("Selected department does not have a 3-character code. Update it in Admin → Departments.");
+            throw new CommonException("Selected department does not have a code. Sync departments from HRMS in Admin → Departments.");
         }
         return dept.getCode().trim().toUpperCase();
     }
@@ -479,27 +503,31 @@ public class JobRequisitionService {
         LocationEntity loc = locationRepository.findById(locationId)
                 .orElseThrow(() -> new CommonException("Selected location was not found."));
         if (loc.getCode() == null || loc.getCode().isBlank()) {
-            throw new CommonException("Selected location does not have a 3-character code. Update it in Admin → Locations.");
+            throw new CommonException("Selected location does not have a code. Sync locations from HRMS in Admin → Locations.");
         }
         return loc.getCode().trim().toUpperCase();
     }
 
     private JobRequisitionDTO toDto(JobRequisitionEntity entity) {
-        String departmentName = null;
+        String departmentName = entity.getDepartmentName();
         String departmentCode = null;
         if (entity.getDepartmentId() != null) {
             DepartmentEntity dept = departmentRepository.findById(entity.getDepartmentId()).orElse(null);
             if (dept != null) {
-                departmentName = dept.getName();
+                if (departmentName == null || departmentName.isBlank()) {
+                    departmentName = dept.getName();
+                }
                 departmentCode = dept.getCode();
             }
         }
-        String locationName = null;
+        String locationName = entity.getLocationName();
         String locationCode = null;
         if (entity.getLocationId() != null) {
             LocationEntity loc = locationRepository.findById(entity.getLocationId()).orElse(null);
             if (loc != null) {
-                locationName = loc.getName();
+                if (locationName == null || locationName.isBlank()) {
+                    locationName = loc.getName();
+                }
                 locationCode = loc.getCode();
             }
         }

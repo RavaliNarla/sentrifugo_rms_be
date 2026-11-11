@@ -34,7 +34,9 @@ public class SecurityConfig {
                         oauth2.bearerTokenResolver(request -> {
                                     String path = request.getRequestURI();
                                     // These carry an HRMS access token, not an RMS JWT.
-                                    if (path != null && (path.contains("/hrms/access") || path.contains("/hrms/enter"))) {
+                                    if (path != null && (path.contains("/hrms/access")
+                                            || path.contains("/hrms/enter")
+                                            || path.contains("/hrms/rms-admins"))) {
                                         return null;
                                     }
                                     return new DefaultBearerTokenResolver().resolve(request);

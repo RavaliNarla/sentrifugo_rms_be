@@ -5,8 +5,10 @@ import com.sentrifugo.rms.common.exception.CommonException;
 import java.util.Locale;
 import java.util.Set;
 
-/** 3-character uppercase codes for department / location (used in requisition codes). */
+/** Department / location codes used in requisition numbers — kept as-is from HRMS (variable length). */
 public final class MasterCodeUtil {
+
+    public static final int MAX_CODE_LENGTH = 64;
 
     private MasterCodeUtil() {
     }
@@ -15,42 +17,45 @@ public final class MasterCodeUtil {
         if (raw == null || raw.isBlank()) {
             throw new CommonException(label + " code is required.");
         }
-        String code = raw.trim().toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
-        if (!code.matches("^[A-Z0-9]{3}$")) {
-            throw new CommonException(label + " code must be exactly 3 letters/digits (A–Z, 0–9).");
+        String code = raw.trim();
+        if (code.length() > MAX_CODE_LENGTH) {
+            throw new CommonException(label + " code must be at most " + MAX_CODE_LENGTH + " characters.");
+        }
+        if (code.replaceAll("[A-Za-z0-9_-]", "").length() > 0) {
+            // Allow letters, digits, underscore, hyphen; strip nothing — reject odd symbols only.
+            String cleaned = code.replaceAll("[^A-Za-z0-9_-]", "");
+            if (cleaned.isBlank()) {
+                throw new CommonException(label + " code must contain letters or digits.");
+            }
+            code = cleaned;
         }
         return code;
     }
 
-    /** Derive a unique 3-char code from a display name, avoiding {@code used} (uppercase). */
+    /** Fallback when HRMS has no code: unique letters from name (not forced to 3 chars). */
     public static String suggestFromName(String name, Set<String> used) {
-        String letters = name == null ? "" : name.toUpperCase(Locale.ROOT).replaceAll("[^A-Z]", "");
+        String letters = name == null ? "" : name.toUpperCase(Locale.ROOT).replaceAll("[^A-Z0-9]", "");
         String base;
         if (letters.length() >= 3) {
-            base = letters.substring(0, 3);
+            base = letters.substring(0, Math.min(8, letters.length()));
         } else if (letters.isEmpty()) {
             base = "XXX";
         } else {
             base = (letters + "XXX").substring(0, 3);
         }
-        if (!used.contains(base)) {
+        String key = base.toUpperCase(Locale.ROOT);
+        if (!used.contains(key)) {
             return base;
         }
-        // Vary 3rd char, then 2nd+3rd via digit suffix.
-        char a = base.charAt(0);
-        char b = base.charAt(1);
-        for (char c = 'A'; c <= 'Z'; c++) {
-            String candidate = "" + a + b + c;
-            if (!used.contains(candidate)) {
+        for (int i = 2; i < 10000; i++) {
+            String candidate = base + i;
+            if (candidate.length() > MAX_CODE_LENGTH) {
+                candidate = candidate.substring(0, MAX_CODE_LENGTH);
+            }
+            if (!used.contains(candidate.toUpperCase(Locale.ROOT))) {
                 return candidate;
             }
         }
-        for (int i = 0; i < 1000; i++) {
-            String candidate = String.format("%c%02d", a, i);
-            if (!used.contains(candidate)) {
-                return candidate;
-            }
-        }
-        throw new CommonException("Unable to generate a unique 3-character code.");
+        throw new CommonException("Unable to generate a unique code.");
     }
 }

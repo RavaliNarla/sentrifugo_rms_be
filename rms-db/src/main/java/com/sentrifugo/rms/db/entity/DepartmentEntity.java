@@ -24,13 +24,21 @@ import java.util.UUID;
 @Where(clause = "is_active = true")
 public class DepartmentEntity extends BaseEntity<UUID> {
 
+    /** IAM department id — sync key. */
+    @Column(name = "hrms_id", unique = true)
+    private String hrmsId;
+
     @Column(name = "name", nullable = false, unique = true)
     private String name;
 
-    /** 3-char code used in requisition numbers (e.g. HR for Human Resources). */
-    @Column(name = "code", length = 3, unique = true)
+    /** Code from HRMS (as-is); used in requisition numbers. */
+    @Column(name = "code", length = 64, unique = true)
     private String code;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
+
+    /** Comma-separated HRMS business-unit ids linked to this department. */
+    @Column(name = "hrms_business_unit_ids", columnDefinition = "TEXT")
+    private String hrmsBusinessUnitIds;
 }

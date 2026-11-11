@@ -22,10 +22,13 @@ public class DepartmentController {
 
     private final DepartmentService departmentService;
 
-    @Operation(summary = "Full unpaginated list - used to populate dropdowns elsewhere")
+    @Operation(summary = "Full unpaginated list - syncs from HRMS when X-Hrms-Authorization is present")
     @GetMapping("/all")
-    public ResponseEntity<ApiResponse<List<DepartmentDTO>>> getAll(@RequestParam(required = false) String search) {
-        return ResponseEntity.ok(ApiResponse.ok(departmentService.getAll(search), "Departments fetched successfully"));
+    public ResponseEntity<ApiResponse<List<DepartmentDTO>>> getAll(
+            @RequestParam(required = false) String search,
+            @RequestHeader(value = "X-Hrms-Authorization", required = false) String hrmsAuthorization) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                departmentService.getAll(search, hrmsAuthorization), "Departments fetched successfully"));
     }
 
     @Operation(summary = "Paginated + searchable list - drives the Departments admin screen")
@@ -33,8 +36,10 @@ public class DepartmentController {
     public ResponseEntity<ApiResponse<Page<DepartmentDTO>>> search(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
-        return ResponseEntity.ok(ApiResponse.ok(departmentService.search(search, page, size), "Departments fetched successfully"));
+            @RequestParam(defaultValue = "10") int size,
+            @RequestHeader(value = "X-Hrms-Authorization", required = false) String hrmsAuthorization) {
+        return ResponseEntity.ok(ApiResponse.ok(
+                departmentService.search(search, page, size, hrmsAuthorization), "Departments fetched successfully"));
     }
 
     @PostMapping("/add")

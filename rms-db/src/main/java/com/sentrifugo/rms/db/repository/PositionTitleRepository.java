@@ -9,25 +9,37 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface PositionTitleRepository extends JpaRepository<PositionTitleEntity, UUID> {
-    List<PositionTitleEntity> findAllByDepartmentIdOrderByNameAsc(UUID departmentId);
+
+    /** Titles linked to this department, or unlinked (appear under every department). */
+    @Query("""
+        SELECT p FROM PositionTitleEntity p
+        WHERE p.departmentId IS NULL OR p.departmentId = :departmentId
+        ORDER BY p.name ASC
+        """)
+    List<PositionTitleEntity> findAvailableForDepartment(@Param("departmentId") UUID departmentId);
 
     boolean existsByNameIgnoreCaseAndDepartmentId(String name, UUID departmentId);
 
-    // Unpaginated - used by MasterDataSeeder to look up existing rows by name.
     List<PositionTitleEntity> findAllByOrderByNameAsc();
 
-    // Paginated - drives the Position Titles admin screen.
     Page<PositionTitleEntity> findAllByOrderByNameAsc(Pageable pageable);
 
     @Query("""
         SELECT p FROM PositionTitleEntity p
         WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :search, '%'))
-           OR LOWER(p.jobDescription) LIKE LOWER(CONCAT('%', :search, '%'))
+           OR LOWER(COALESCE(p.jobDescription, '')) LIKE LOWER(CONCAT('%', :search, '%'))
         ORDER BY p.name ASC
         """)
     Page<PositionTitleEntity> search(@Param("search") String search, Pageable pageable);
+
+    @Query(value = "SELECT * FROM common.position_titles WHERE hrms_id = :hrmsId LIMIT 1", nativeQuery = true)
+    Optional<PositionTitleEntity> findIncludingInactiveByHrmsId(@Param("hrmsId") String hrmsId);
+
+    @Query(value = "SELECT * FROM common.position_titles WHERE hrms_id IS NOT NULL", nativeQuery = true)
+    List<PositionTitleEntity> findAllWithHrmsIdIncludingInactive();
 }

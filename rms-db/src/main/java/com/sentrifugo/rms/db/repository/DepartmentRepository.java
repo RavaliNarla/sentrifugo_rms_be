@@ -4,9 +4,12 @@ import com.sentrifugo.rms.db.entity.DepartmentEntity;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
@@ -17,8 +20,12 @@ public interface DepartmentRepository extends JpaRepository<DepartmentEntity, UU
     boolean existsByCodeIgnoreCase(String code);
     boolean existsByCodeIgnoreCaseAndIdNot(String code, UUID id);
 
-    // Paginated variants for the admin list screen (the unpaginated methods above stay as-is
-    // since they're also used to populate dropdowns elsewhere, which need the full list).
     Page<DepartmentEntity> findAllByOrderByNameAsc(Pageable pageable);
     Page<DepartmentEntity> findByNameContainingIgnoreCaseOrderByNameAsc(String name, Pageable pageable);
+
+    @Query(value = "SELECT * FROM common.departments WHERE hrms_id = :hrmsId LIMIT 1", nativeQuery = true)
+    Optional<DepartmentEntity> findIncludingInactiveByHrmsId(@Param("hrmsId") String hrmsId);
+
+    @Query(value = "SELECT * FROM common.departments WHERE hrms_id IS NOT NULL", nativeQuery = true)
+    List<DepartmentEntity> findAllWithHrmsIdIncludingInactive();
 }

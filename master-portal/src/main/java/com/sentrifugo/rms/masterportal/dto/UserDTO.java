@@ -31,4 +31,16 @@ public class UserDTO {
 
     /** Unused for HRMS-linked users. Left for older update payloads. */
     private String password;
+
+    /**
+     * Approver slot from {@code hr.requisition_approvers}: {@code NONE}, {@code L1}, or {@code L2}.
+     * On write: omit/null on update means leave unchanged; on add, null means NONE.
+     */
+    private String approverAccess;
+
+    /**
+     * Required when clearing this user's L1/L2 slot (or deleting them while they hold one).
+     * Must be another active user who is not already an approver.
+     */
+    private UUID replacementUserId;
 }
