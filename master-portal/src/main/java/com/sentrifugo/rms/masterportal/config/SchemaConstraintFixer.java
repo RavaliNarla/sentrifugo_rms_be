@@ -61,11 +61,18 @@ public class SchemaConstraintFixer implements CommandLineRunner {
                     ALTER TABLE recruitment.candidate_offers ADD CONSTRAINT candidate_offers_status_check CHECK (
                       status::text = ANY (ARRAY[
                         'GENERATED','L1_PENDING','L2_PENDING','L1_REJECTED','L2_REJECTED',
-                        'SENT','ACCEPTED','REJECTED','EXPIRED'
+                        'SENT','ACCEPTED','SENT_TO_ONBOARDING','REJECTED','EXPIRED'
                       ]::text[])
                     )
                     """);
-            log.info("Ensured recruitment.candidate_offers_status_check includes approval + decision statuses");
+            jdbcTemplate.execute("""
+                    UPDATE recruitment.candidate_offers
+                    SET status = 'SENT_TO_ONBOARDING'
+                    WHERE status = 'ACCEPTED'
+                      AND hrms_onboarding_id IS NOT NULL
+                      AND btrim(hrms_onboarding_id) <> ''
+                    """);
+            log.info("Ensured recruitment.candidate_offers_status_check includes SENT_TO_ONBOARDING");
         } catch (Exception e) {
             log.warn("Could not refresh candidate_offers_status_check: {}", e.getMessage());
         }

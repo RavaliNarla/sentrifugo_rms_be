@@ -80,8 +80,9 @@ public class OfferService {
     @Value("${app.company.name:Sagar Cements Limited}")
     private String companyName;
 
-    /** SCL_41: only accepted/rejected offers are locked; everything else can be regenerated and resent. */
-    private static final List<OfferStatus> TERMINAL = List.of(OfferStatus.ACCEPTED, OfferStatus.REJECTED);
+    /** SCL_41: accepted / sent-to-onboarding / rejected offers are locked from regenerate. */
+    private static final List<OfferStatus> TERMINAL = List.of(
+            OfferStatus.ACCEPTED, OfferStatus.SENT_TO_ONBOARDING, OfferStatus.REJECTED);
 
     // An offer already submitted for L1/L2 approval can't be silently regenerated out from under
     // the approver - the recruiter must wait for a decision (or have it rejected) first.
@@ -417,7 +418,9 @@ public class OfferService {
         }
         CandidateOfferEntity offer = offerOpt.get();
 
-        if (offer.getStatus() == OfferStatus.ACCEPTED || offer.getStatus() == OfferStatus.REJECTED) {
+        if (offer.getStatus() == OfferStatus.ACCEPTED
+                || offer.getStatus() == OfferStatus.SENT_TO_ONBOARDING
+                || offer.getStatus() == OfferStatus.REJECTED) {
             return offer.getStatus().name();
         }
 
@@ -458,16 +461,18 @@ public class OfferService {
             CandidateOfferEntity offer = candidateOfferRepository.findByCandidateId(candidateId)
                     .orElseThrow(() -> new CommonException(
                             "Candidate '" + candidate.getName() + "' has no offer record."));
+            if (offer.getStatus() == OfferStatus.SENT_TO_ONBOARDING
+                    || (offer.getHrmsOnboardingId() != null && !offer.getHrmsOnboardingId().isBlank())) {
+                throw new CommonException(
+                        "Candidate '" + candidate.getName() + "' was already sent to onboarding.");
+            }
             if (offer.getStatus() != OfferStatus.ACCEPTED) {
                 throw new CommonException(
                         "Candidate '" + candidate.getName() + "' is not in OFFER ACCEPTED status.");
             }
-            if (offer.getHrmsOnboardingId() != null && !offer.getHrmsOnboardingId().isBlank()) {
-                throw new CommonException(
-                        "Candidate '" + candidate.getName() + "' was already sent to onboarding.");
-            }
             String onboardingId = hrmsOnboardingPushService.pushOfferAccepted(offer.getId(), hrmsAuthorization);
             offer.setHrmsOnboardingId(onboardingId);
+            offer.setStatus(OfferStatus.SENT_TO_ONBOARDING);
             candidateOfferRepository.save(offer);
             sent++;
         }

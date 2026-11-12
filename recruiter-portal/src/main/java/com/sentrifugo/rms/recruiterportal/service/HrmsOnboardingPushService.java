@@ -110,8 +110,27 @@ public class HrmsOnboardingPushService {
             throw ex;
         } catch (Exception ex) {
             log.error("HRMS onboarding push failed for offer {}: {}", offerId, ex.getMessage(), ex);
-            throw new CommonException("Failed to send '" + candidate.getName() + "' to HRMS onboarding: " + ex.getMessage());
+            throw new CommonException(readablePushFailure(candidate.getName(), ex));
         }
+    }
+
+    /** Maps known HRMS failures into short toast-friendly messages. */
+    private static String readablePushFailure(String candidateName, Exception ex) {
+        String raw = ex.getMessage() == null ? "" : ex.getMessage();
+        String lower = raw.toLowerCase(Locale.ROOT);
+        if (lower.contains("403")
+                || lower.contains("manage_onboarding")
+                || lower.contains("permission denied")) {
+            return "You do not have permission to send candidates to HRMS onboarding. "
+                    + "Ask an HRMS admin to grant the manage_onboarding permission.";
+        }
+        if (lower.contains("409")
+                || lower.contains("email already exists")
+                || lower.contains("user with this email already exists")) {
+            return "A user with this email already exists in HRMS, so '"
+                    + candidateName + "' cannot be sent to onboarding.";
+        }
+        return "Failed to send '" + candidateName + "' to HRMS onboarding: " + raw;
     }
 
     private ResumeFile loadResume(String resumeUrl) throws Exception {

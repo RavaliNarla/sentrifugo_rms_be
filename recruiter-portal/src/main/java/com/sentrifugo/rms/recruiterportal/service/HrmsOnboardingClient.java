@@ -5,17 +5,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.MediaType;
-import org.springframework.http.client.JdkClientHttpRequestFactory;
-import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
-import java.net.http.HttpClient;
-import java.time.Duration;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.util.UUID;
 
 /**
  * HRMS IAM onboarding APIs ({@code POST /onboarding/resume} then {@code POST /onboarding}).
@@ -26,6 +26,8 @@ import java.time.LocalDate;
 @Component
 public class HrmsOnboardingClient {
 
+    private static final String CRLF = "\r\n";
+
     private final ObjectMapper objectMapper;
     private final RestClient restClient;
     private final String iamBaseUrl;
@@ -35,34 +37,37 @@ public class HrmsOnboardingClient {
             @Value("${hrms.iam.base-url:http://172.16.2.111:8000/api/iam}") String iamBaseUrl) {
         this.objectMapper = objectMapper;
         this.iamBaseUrl = trimTrailingSlash(iamBaseUrl);
-        HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-        JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(client);
-        factory.setReadTimeout(Duration.ofSeconds(60));
+        // HttpURLConnection (not JDK HttpClient) — uvicorn rejects JDK multipart framing.
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10_000);
+        factory.setReadTimeout(60_000);
         this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
     /** Uploads resume bytes; returns HRMS {@code assetId}. */
     public String uploadResume(String hrmsBearerToken, byte[] fileBytes, String fileName, String contentType) {
         requireToken(hrmsBearerToken);
-        MultipartBodyBuilder body = new MultipartBodyBuilder();
         String name = (fileName == null || fileName.isBlank()) ? "resume.pdf" : fileName;
         MediaType mediaType = contentType == null || contentType.isBlank()
                 ? MediaType.APPLICATION_OCTET_STREAM
                 : MediaType.parseMediaType(contentType);
-        body.part("file", new ByteArrayResource(fileBytes) {
-            @Override
-            public String getFilename() {
-                return name;
-            }
-        }).contentType(mediaType);
+        // Explicit boundary + body (same shape as curl -F / browser FormData). Spring's
+        // MultipartBodyBuilder + JDK client still produces 400/422 against Mac uvicorn.
+        String boundary = "----WebKitFormBoundary" + UUID.randomUUID().toString().replace("-", "");
+        byte[] multipartBody;
+        try {
+            multipartBody = buildMultipartFileBody(boundary, "file", name, mediaType, fileBytes);
+        } catch (IOException ex) {
+            throw new IllegalStateException("HRMS resume upload failed: could not build multipart body", ex);
+        }
 
         try {
             String response = restClient.post()
                     .uri(iamBaseUrl + "/onboarding/resume")
                     .header("Authorization", bearerHeader(hrmsBearerToken))
                     .header("accept", "*/*")
-                    .contentType(MediaType.MULTIPART_FORM_DATA)
-                    .body(body.build())
+                    .contentType(MediaType.parseMediaType("multipart/form-data; boundary=" + boundary))
+                    .body(multipartBody)
                     .retrieve()
                     .body(String.class);
             JsonNode root = objectMapper.readTree(response == null ? "{}" : response);
@@ -72,8 +77,9 @@ public class HrmsOnboardingClient {
             }
             return assetId;
         } catch (RestClientResponseException ex) {
-            log.warn("HRMS resume upload → {}: {}", ex.getStatusCode().value(), ex.getResponseBodyAsString());
-            throw new IllegalStateException("HRMS resume upload failed (" + ex.getStatusCode().value() + ")");
+            String bodyText = ex.getResponseBodyAsString();
+            log.warn("HRMS resume upload → {}: {}", ex.getStatusCode().value(), bodyText);
+            throw new IllegalStateException(hrmsHttpError("HRMS resume upload failed", ex.getStatusCode().value(), bodyText));
         } catch (IllegalStateException ex) {
             throw ex;
         } catch (Exception ex) {
@@ -84,9 +90,12 @@ public class HrmsOnboardingClient {
     public String createOnboarding(String hrmsBearerToken, OnboardingPayload payload) {
         requireToken(hrmsBearerToken);
         ObjectNode body = objectMapper.createObjectNode();
-        body.put("firstName", nullToEmpty(payload.firstName()));
-        body.put("middleName", blankAsSpace(payload.middleName()));
-        body.put("lastName", nullToEmpty(payload.lastName()));
+        // Names / country code: JSON null when blank — never a placeholder space.
+        // HRMS CreateOnboardingRequest: middleName + personalCountryCode are Optional;
+        // lastName is still required (min_length=1) by IAM schema when present on the candidate.
+        putTextOrNull(body, "firstName", payload.firstName());
+        putTextOrNull(body, "middleName", payload.middleName());
+        putTextOrNull(body, "lastName", payload.lastName());
         if (payload.dateOfBirth() != null) {
             body.put("dateOfBirth", payload.dateOfBirth().toString());
         } else {
@@ -97,11 +106,11 @@ public class HrmsOnboardingClient {
         } else {
             body.putNull("gender");
         }
-        body.put("personalEmail", nullToEmpty(payload.personalEmail()));
-        body.put("personalPhone", nullToEmpty(payload.personalPhone()));
+        putTextOrNull(body, "personalEmail", payload.personalEmail());
+        putTextOrNull(body, "personalPhone", payload.personalPhone());
         body.put("isRMS", true);
-        body.put("personalCountryCode", " ");
-        body.put("requisitionId", payload.requisitionCode());
+        body.putNull("personalCountryCode");
+        putTextOrNull(body, "requisitionId", payload.requisitionCode());
         body.putNull("reportingManagerId");
         putIdOrNull(body, "businessUnitId", payload.businessUnitHrmsId());
         putIdOrNull(body, "departmentId", payload.departmentHrmsId());
@@ -130,13 +139,48 @@ public class HrmsOnboardingClient {
             }
             return id;
         } catch (RestClientResponseException ex) {
-            log.warn("HRMS onboarding create → {}: {}", ex.getStatusCode().value(), ex.getResponseBodyAsString());
-            throw new IllegalStateException("HRMS onboarding create failed (" + ex.getStatusCode().value() + ")");
+            String bodyText = ex.getResponseBodyAsString();
+            log.warn("HRMS onboarding create → {}: {}", ex.getStatusCode().value(), bodyText);
+            throw new IllegalStateException(hrmsHttpError("HRMS onboarding create failed", ex.getStatusCode().value(), bodyText));
         } catch (IllegalStateException ex) {
             throw ex;
         } catch (Exception ex) {
             throw new IllegalStateException("HRMS onboarding create failed: " + ex.getMessage(), ex);
         }
+    }
+
+    /**
+     * Builds a single-file multipart body matching browser / {@code curl -F} shape.
+     * Header {@code Content-Type} must include the same {@code boundary}.
+     */
+    private static byte[] buildMultipartFileBody(
+            String boundary,
+            String fieldName,
+            String fileName,
+            MediaType partContentType,
+            byte[] fileBytes) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream(fileBytes.length + 512);
+        String safeName = fileName.replace("\"", "_");
+        out.write(("--" + boundary + CRLF).getBytes(StandardCharsets.UTF_8));
+        out.write(("Content-Disposition: form-data; name=\"" + fieldName
+                + "\"; filename=\"" + safeName + "\"" + CRLF).getBytes(StandardCharsets.UTF_8));
+        out.write(("Content-Type: " + partContentType + CRLF).getBytes(StandardCharsets.UTF_8));
+        out.write(CRLF.getBytes(StandardCharsets.UTF_8));
+        out.write(fileBytes);
+        out.write(CRLF.getBytes(StandardCharsets.UTF_8));
+        out.write(("--" + boundary + "--" + CRLF).getBytes(StandardCharsets.UTF_8));
+        return out.toByteArray();
+    }
+
+    private static String hrmsHttpError(String prefix, int status, String body) {
+        if (body == null || body.isBlank()) {
+            return prefix + " (" + status + ")";
+        }
+        String trimmed = body.trim();
+        if (trimmed.length() > 400) {
+            trimmed = trimmed.substring(0, 400) + "…";
+        }
+        return prefix + " (" + status + "): " + trimmed;
     }
 
     private static void requireToken(String hrmsBearerToken) {
@@ -153,15 +197,12 @@ public class HrmsOnboardingClient {
         }
     }
 
-    private static String blankAsSpace(String value) {
+    private static void putTextOrNull(ObjectNode body, String field, String value) {
         if (value == null || value.isBlank()) {
-            return " ";
+            body.putNull(field);
+        } else {
+            body.put(field, value.trim());
         }
-        return value.trim();
-    }
-
-    private static String nullToEmpty(String value) {
-        return value == null ? "" : value.trim();
     }
 
     private static String text(JsonNode n, String field) {

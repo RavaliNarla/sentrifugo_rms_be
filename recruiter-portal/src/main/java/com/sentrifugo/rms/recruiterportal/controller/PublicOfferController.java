@@ -43,7 +43,7 @@ public class PublicOfferController {
         String message;
         String color;
         switch (result) {
-            case "ACCEPTED" -> {
+            case "ACCEPTED", "SENT_TO_ONBOARDING" -> {
                 title = "Offer Accepted";
                 message = "Thank you! Your acceptance has been recorded successfully.";
                 color = "#208bbd";

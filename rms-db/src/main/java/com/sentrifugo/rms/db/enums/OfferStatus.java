@@ -11,6 +11,8 @@ public enum OfferStatus {
     /** L2-approved and automatically emailed to the candidate. */
     SENT,
     ACCEPTED,
+    /** Candidate accepted the offer and was pushed into HRMS onboarding. */
+    SENT_TO_ONBOARDING,
     REJECTED,
     EXPIRED
 }
